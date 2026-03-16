@@ -103,14 +103,14 @@ local function enableFly()
 
     flyConn = RunService.RenderStepped:Connect(function(dt)
         if not flyEnabled then return end
-        local cam = workspace.CurrentCamera
-        local dir = Vector3.zero
         local spd = flySpeed
+        local moveDir = hum.MoveDirection
+        local cam = workspace.CurrentCamera
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector  end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector  end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
+        local dir =
+            cam.CFrame.RightVector * moveDir.X +
+            cam.CFrame.LookVector  * moveDir.Z
+
         if UserInputService:IsKeyDown(Enum.KeyCode.Space)       then dir += Vector3.yAxis end
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.yAxis end
 
