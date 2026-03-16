@@ -1,6 +1,6 @@
 -- =========================================================
--- TIOO Fly Script - Roblox
--- by Tiooprime2 | Ninja Legends fix
+-- TIOO Fly Script - Roblox | Ninja Legends
+-- by Tiooprime2
 -- =========================================================
 
 local Players          = game:GetService("Players")
@@ -15,6 +15,7 @@ local hum  = char:WaitForChild("Humanoid")
 
 local flyEnabled = false
 local flySpeed   = 50
+local flyConn    = nil
 
 -- =========================================================
 -- THEME
@@ -23,16 +24,19 @@ local T = {
     BG_DARK      = Color3.fromRGB(8,   8,  12),
     BG_PANEL     = Color3.fromRGB(14,  14, 20),
     BG_CARD      = Color3.fromRGB(20,  20, 30),
+    BG_CARD_ON   = Color3.fromRGB(18,  42, 24),
     BG_HOVER     = Color3.fromRGB(28,  28, 42),
-    BG_ACTIVE    = Color3.fromRGB(35,  55, 85),
     ACCENT       = Color3.fromRGB(80,  140, 255),
     ACCENT_GLOW  = Color3.fromRGB(60,  100, 220),
     GREEN        = Color3.fromRGB(50,  210, 120),
-    GREEN_BG     = Color3.fromRGB(15,  35,  20),
+    GREEN_PILL   = Color3.fromRGB(40,  180, 100),
     RED          = Color3.fromRGB(255, 70,  70),
+    GRAY_PILL    = Color3.fromRGB(45,  45,  60),
     TEXT_PRIMARY = Color3.fromRGB(235, 235, 245),
     TEXT_MUTED   = Color3.fromRGB(130, 130, 160),
+    TEXT_ON      = Color3.fromRGB(120, 230, 160),
     BORDER       = Color3.fromRGB(40,  40,  60),
+    LEFT_BAR     = Color3.fromRGB(60,  60,  80),
 }
 
 -- =========================================================
@@ -91,63 +95,44 @@ local function makeDraggable(frame, handle)
 end
 
 -- =========================================================
--- FLY LOGIC — CFrame based (works on Ninja Legends)
+-- FLY LOGIC
 -- =========================================================
-local flyConn
-
 local function enableFly()
-    -- Matikan gravity & physics
+    if flyConn then flyConn:Disconnect() end
     hum.PlatformStand = true
 
     flyConn = RunService.RenderStepped:Connect(function(dt)
         if not flyEnabled then return end
-
         local cam = workspace.CurrentCamera
-        local moveDir = Vector3.zero
-        local spd = flySpeed * 0.8
+        local dir = Vector3.zero
+        local spd = flySpeed
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            moveDir += cam.CFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-            moveDir -= cam.CFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-            moveDir -= cam.CFrame.RightVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-            moveDir += cam.CFrame.RightVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            moveDir += Vector3.yAxis
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-            moveDir -= Vector3.yAxis
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector  end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector  end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space)       then dir += Vector3.yAxis end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.yAxis end
+
+        if dir.Magnitude > 0 then
+            hrp.CFrame = hrp.CFrame + dir.Unit * spd * dt
         end
 
-        if moveDir.Magnitude > 0 then
-            local newCF = hrp.CFrame + (moveDir.Unit * spd * dt * 60)
-            hrp.CFrame = newCF
-        end
-
-        -- Keep freezed in place when not moving
-        hrp.Velocity        = Vector3.zero
-        hrp.RotVelocity     = Vector3.zero
+        -- Freeze physics
+        hrp.AssemblyLinearVelocity  = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
     end)
 end
 
 local function disableFly()
+    if flyConn then flyConn:Disconnect(); flyConn = nil end
     hum.PlatformStand = false
-    if flyConn then
-        flyConn:Disconnect()
-        flyConn = nil
-    end
 end
 
 lp.CharacterAdded:Connect(function(c)
-    char       = c
-    hrp        = c:WaitForChild("HumanoidRootPart")
-    hum        = c:WaitForChild("Humanoid")
+    char = c
+    hrp  = c:WaitForChild("HumanoidRootPart")
+    hum  = c:WaitForChild("Humanoid")
     flyEnabled = false
     disableFly()
 end)
@@ -167,19 +152,19 @@ gui.Parent       = guiParent
 -- Main Frame
 local frame = Instance.new("Frame")
 frame.Name             = "Main"
-frame.Size             = UDim2.new(0, 185, 0, 0)
+frame.Size             = UDim2.new(0, 220, 0, 0)
 frame.Position         = UDim2.new(0.02, 0, 0.28, 0)
 frame.BackgroundColor3 = T.BG_DARK
 frame.BorderSizePixel  = 0
 frame.ClipsDescendants = true
 frame.Parent           = gui
-corner(frame, 12)
+corner(frame, 14)
 stroke(frame, T.BORDER, 1)
 
 -- Top accent line
 local topGlow = Instance.new("Frame")
-topGlow.Size             = UDim2.new(0.5, 0, 0, 2)
-topGlow.Position         = UDim2.new(0.25, 0, 0, 0)
+topGlow.Size             = UDim2.new(0.45, 0, 0, 2)
+topGlow.Position         = UDim2.new(0.275, 0, 0, 0)
 topGlow.BackgroundColor3 = T.ACCENT
 topGlow.BorderSizePixel  = 0
 topGlow.ZIndex           = 5
@@ -188,57 +173,56 @@ corner(topGlow, 2)
 
 -- Header
 local header = Instance.new("Frame")
-header.Size             = UDim2.new(1, 0, 0, 40)
+header.Size             = UDim2.new(1, 0, 0, 44)
 header.BackgroundColor3 = T.BG_PANEL
 header.BorderSizePixel  = 0
 header.Parent           = frame
-corner(header, 12)
+corner(header, 14)
 
 local hfix = Instance.new("Frame")
-hfix.Size             = UDim2.new(1, 0, 0, 8)
-hfix.Position         = UDim2.new(0, 0, 1, -8)
+hfix.Size             = UDim2.new(1, 0, 0, 10)
+hfix.Position         = UDim2.new(0, 0, 1, -10)
 hfix.BackgroundColor3 = T.BG_PANEL
 hfix.BorderSizePixel  = 0
 hfix.Parent           = header
 
 -- Logo
 local logoBox = Instance.new("Frame")
-logoBox.Size             = UDim2.new(0, 26, 0, 26)
-logoBox.Position         = UDim2.new(0, 8, 0.5, -13)
+logoBox.Size             = UDim2.new(0, 30, 0, 30)
+logoBox.Position         = UDim2.new(0, 10, 0.5, -15)
 logoBox.BackgroundColor3 = T.ACCENT
 logoBox.BorderSizePixel  = 0
 logoBox.Parent           = header
-corner(logoBox, 7)
+corner(logoBox, 8)
 local g = Instance.new("UIGradient")
 g.Color    = ColorSequence.new(T.ACCENT, T.ACCENT_GLOW)
 g.Rotation = 135
 g.Parent   = logoBox
 
-local logoTxt = Instance.new("TextLabel")
-logoTxt.Size                  = UDim2.new(1, 0, 1, 0)
-logoTxt.BackgroundTransparency = 1
-logoTxt.Text                  = "T"
-logoTxt.TextColor3            = Color3.fromRGB(255, 255, 255)
-logoTxt.Font                  = Enum.Font.GothamBold
-logoTxt.TextSize              = 13
-logoTxt.Parent                = logoBox
+Instance.new("TextLabel", logoBox).Size = UDim2.new(1,0,1,0)
+local lt = logoBox:FindFirstChildOfClass("TextLabel")
+lt.BackgroundTransparency = 1
+lt.Text      = "T"
+lt.TextColor3 = Color3.fromRGB(255,255,255)
+lt.Font      = Enum.Font.GothamBold
+lt.TextSize  = 15
 
 local titleLbl = Instance.new("TextLabel")
-titleLbl.Size                  = UDim2.new(1, -76, 0, 15)
-titleLbl.Position              = UDim2.new(0, 40, 0, 5)
+titleLbl.Size                  = UDim2.new(1, -90, 0, 16)
+titleLbl.Position              = UDim2.new(0, 48, 0, 6)
 titleLbl.BackgroundTransparency = 1
-titleLbl.Text                  = "TIOO Fly"
+titleLbl.Text                  = "TIOO FLY"
 titleLbl.TextColor3            = T.TEXT_PRIMARY
 titleLbl.Font                  = Enum.Font.GothamBold
-titleLbl.TextSize              = 12
+titleLbl.TextSize              = 13
 titleLbl.TextXAlignment        = Enum.TextXAlignment.Left
 titleLbl.Parent                = header
 
 local subLbl = Instance.new("TextLabel")
-subLbl.Size                  = UDim2.new(1, -76, 0, 11)
-subLbl.Position              = UDim2.new(0, 40, 0, 23)
+subLbl.Size                  = UDim2.new(1, -90, 0, 12)
+subLbl.Position              = UDim2.new(0, 48, 0, 25)
 subLbl.BackgroundTransparency = 1
-subLbl.Text                  = "by Tiooprime2"
+subLbl.Text                  = "Ninja Legends  •  by Tiooprime2"
 subLbl.TextColor3            = T.TEXT_MUTED
 subLbl.Font                  = Enum.Font.Gotham
 subLbl.TextSize              = 9
@@ -246,24 +230,24 @@ subLbl.TextXAlignment        = Enum.TextXAlignment.Left
 subLbl.Parent                = header
 
 local closeBtn = Instance.new("TextButton")
-closeBtn.Size             = UDim2.new(0, 22, 0, 22)
-closeBtn.Position         = UDim2.new(1, -30, 0.5, -11)
+closeBtn.Size             = UDim2.new(0, 26, 0, 26)
+closeBtn.Position         = UDim2.new(1, -36, 0.5, -13)
 closeBtn.BackgroundColor3 = Color3.fromRGB(45, 20, 20)
 closeBtn.Text             = "✕"
 closeBtn.TextColor3       = T.RED
 closeBtn.Font             = Enum.Font.GothamBold
-closeBtn.TextSize         = 11
+closeBtn.TextSize         = 12
 closeBtn.BorderSizePixel  = 0
 closeBtn.Parent           = header
-corner(closeBtn, 6)
+corner(closeBtn, 8)
 stroke(closeBtn, T.RED, 1)
 
 makeDraggable(frame, header)
 
 -- Body
 local body = Instance.new("Frame")
-body.Size                  = UDim2.new(1, -16, 0, 112)
-body.Position              = UDim2.new(0, 8, 0, 46)
+body.Size                  = UDim2.new(1, -16, 0, 130)
+body.Position              = UDim2.new(0, 8, 0, 50)
 body.BackgroundTransparency = 1
 body.Parent                = frame
 
@@ -271,95 +255,123 @@ local layout = Instance.new("UIListLayout")
 layout.Padding = UDim.new(0, 6)
 layout.Parent  = body
 
--- ── Fly Toggle Card ──────────────────────────────────────
-local flyCard = Instance.new("Frame")
-flyCard.Size             = UDim2.new(1, 0, 0, 48)
-flyCard.BackgroundColor3 = T.BG_CARD
-flyCard.BorderSizePixel  = 0
-flyCard.Parent           = body
-corner(flyCard, 8)
-stroke(flyCard, T.BORDER, 1)
+-- =========================================================
+-- CARD BUILDER (style kayak screenshot)
+-- =========================================================
+local function createCard(parent, emoji, name, desc)
+    -- Outer card
+    local card = Instance.new("Frame")
+    card.Size             = UDim2.new(1, 0, 0, 56)
+    card.BackgroundColor3 = T.BG_CARD
+    card.BorderSizePixel  = 0
+    card.Parent           = parent
+    corner(card, 10)
+    stroke(card, T.BORDER, 1)
 
--- Emoji + Label
-local flyEmoji = Instance.new("TextLabel")
-flyEmoji.Size                  = UDim2.new(0, 28, 1, 0)
-flyEmoji.Position              = UDim2.new(0, 8, 0, 0)
-flyEmoji.BackgroundTransparency = 1
-flyEmoji.Text                  = "🪂"
-flyEmoji.TextSize              = 18
-flyEmoji.Font                  = Enum.Font.GothamBold
-flyEmoji.Parent                = flyCard
+    -- Left accent bar (abu default, hijau kalau ON)
+    local bar = Instance.new("Frame")
+    bar.Size             = UDim2.new(0, 3, 0.7, 0)
+    bar.Position         = UDim2.new(0, 0, 0.15, 0)
+    bar.BackgroundColor3 = T.LEFT_BAR
+    bar.BorderSizePixel  = 0
+    bar.Parent           = card
+    corner(bar, 2)
 
-local flyLabel = Instance.new("TextLabel")
-flyLabel.Size                  = UDim2.new(1, -80, 0, 18)
-flyLabel.Position              = UDim2.new(0, 40, 0, 6)
-flyLabel.BackgroundTransparency = 1
-flyLabel.Text                  = "Fly"
-flyLabel.TextColor3            = T.TEXT_PRIMARY
-flyLabel.Font                  = Enum.Font.GothamSemibold
-flyLabel.TextSize              = 13
-flyLabel.TextXAlignment        = Enum.TextXAlignment.Left
-flyLabel.Parent                = flyCard
+    -- Emoji
+    local emojiLbl = Instance.new("TextLabel")
+    emojiLbl.Size                  = UDim2.new(0, 30, 1, 0)
+    emojiLbl.Position              = UDim2.new(0, 10, 0, 0)
+    emojiLbl.BackgroundTransparency = 1
+    emojiLbl.Text                  = emoji
+    emojiLbl.TextSize              = 18
+    emojiLbl.Font                  = Enum.Font.GothamBold
+    emojiLbl.Parent                = card
 
-local flyDesc = Instance.new("TextLabel")
-flyDesc.Size                  = UDim2.new(1, -80, 0, 12)
-flyDesc.Position              = UDim2.new(0, 40, 0, 28)
-flyDesc.BackgroundTransparency = 1
-flyDesc.Text                  = "WASD + Space / Ctrl"
-flyDesc.TextColor3            = T.TEXT_MUTED
-flyDesc.Font                  = Enum.Font.Gotham
-flyDesc.TextSize              = 9
-flyDesc.TextXAlignment        = Enum.TextXAlignment.Left
-flyDesc.Parent                = flyCard
+    -- Name
+    local nameLbl = Instance.new("TextLabel")
+    nameLbl.Size                  = UDim2.new(1, -110, 0, 20)
+    nameLbl.Position              = UDim2.new(0, 44, 0, 8)
+    nameLbl.BackgroundTransparency = 1
+    nameLbl.Text                  = name
+    nameLbl.TextColor3            = T.TEXT_PRIMARY
+    nameLbl.Font                  = Enum.Font.GothamSemibold
+    nameLbl.TextSize              = 13
+    nameLbl.TextXAlignment        = Enum.TextXAlignment.Left
+    nameLbl.Parent                = card
 
--- Status badge
-local badge = Instance.new("TextLabel")
-badge.Size             = UDim2.new(0, 42, 0, 20)
-badge.Position         = UDim2.new(1, -50, 0.5, -10)
-badge.BackgroundColor3 = Color3.fromRGB(45, 20, 20)
-badge.Text             = "OFF"
-badge.TextColor3       = T.RED
-badge.Font             = Enum.Font.GothamBold
-badge.TextSize         = 10
-badge.BorderSizePixel  = 0
-badge.Parent           = flyCard
-corner(badge, 6)
-stroke(badge, T.RED, 1)
+    -- Desc
+    local descLbl = Instance.new("TextLabel")
+    descLbl.Size                  = UDim2.new(1, -110, 0, 14)
+    descLbl.Position              = UDim2.new(0, 44, 0, 32)
+    descLbl.BackgroundTransparency = 1
+    descLbl.Text                  = desc
+    descLbl.TextColor3            = T.TEXT_MUTED
+    descLbl.Font                  = Enum.Font.Gotham
+    descLbl.TextSize              = 10
+    descLbl.TextXAlignment        = Enum.TextXAlignment.Left
+    descLbl.Parent                = card
 
--- ── Speed Slider Card ────────────────────────────────────
+    -- Pill button (OFF/ON)
+    local pill = Instance.new("TextButton")
+    pill.Size             = UDim2.new(0, 52, 0, 26)
+    pill.Position         = UDim2.new(1, -62, 0.5, -13)
+    pill.BackgroundColor3 = T.GRAY_PILL
+    pill.Text             = "OFF"
+    pill.TextColor3       = T.TEXT_MUTED
+    pill.Font             = Enum.Font.GothamBold
+    pill.TextSize         = 11
+    pill.BorderSizePixel  = 0
+    pill.Parent           = card
+    corner(pill, 13)
+
+    return card, pill, bar, descLbl
+end
+
+-- ── Fly Card ─────────────────────────────────────────────
+local flyCard, flyPill, flyBar, flyDesc = createCard(body, "🪂", "Fly", "WASD + Space / Ctrl")
+
+-- ── Speed Card ───────────────────────────────────────────
 local speedCard = Instance.new("Frame")
-speedCard.Size             = UDim2.new(1, 0, 0, 52)
+speedCard.Size             = UDim2.new(1, 0, 0, 60)
 speedCard.BackgroundColor3 = T.BG_CARD
 speedCard.BorderSizePixel  = 0
 speedCard.Parent           = body
-corner(speedCard, 8)
+corner(speedCard, 10)
 stroke(speedCard, T.BORDER, 1)
 
+local speedBar = Instance.new("Frame")
+speedBar.Size             = UDim2.new(0, 3, 0.7, 0)
+speedBar.Position         = UDim2.new(0, 0, 0.15, 0)
+speedBar.BackgroundColor3 = T.ACCENT
+speedBar.BorderSizePixel  = 0
+speedBar.Parent           = speedCard
+corner(speedBar, 2)
+
 local speedName = Instance.new("TextLabel")
-speedName.Size                  = UDim2.new(0.55, 0, 0, 16)
-speedName.Position              = UDim2.new(0, 10, 0, 6)
+speedName.Size                  = UDim2.new(0.55, 0, 0, 18)
+speedName.Position              = UDim2.new(0, 14, 0, 6)
 speedName.BackgroundTransparency = 1
 speedName.Text                  = "Speed"
 speedName.TextColor3            = T.TEXT_PRIMARY
 speedName.Font                  = Enum.Font.GothamSemibold
-speedName.TextSize              = 11
+speedName.TextSize              = 12
 speedName.TextXAlignment        = Enum.TextXAlignment.Left
 speedName.Parent                = speedCard
 
 local speedVal = Instance.new("TextLabel")
-speedVal.Size                  = UDim2.new(0.45, -10, 0, 16)
+speedVal.Size                  = UDim2.new(0.4, -10, 0, 18)
 speedVal.Position              = UDim2.new(0.55, 0, 0, 6)
 speedVal.BackgroundTransparency = 1
 speedVal.Text                  = tostring(flySpeed)
 speedVal.TextColor3            = T.ACCENT
 speedVal.Font                  = Enum.Font.GothamBold
-speedVal.TextSize              = 11
+speedVal.TextSize              = 12
 speedVal.TextXAlignment        = Enum.TextXAlignment.Right
 speedVal.Parent                = speedCard
 
 local track = Instance.new("Frame")
-track.Size             = UDim2.new(1, -20, 0, 5)
-track.Position         = UDim2.new(0, 10, 0, 34)
+track.Size             = UDim2.new(1, -24, 0, 5)
+track.Position         = UDim2.new(0, 12, 0, 38)
 track.BackgroundColor3 = T.BG_HOVER
 track.BorderSizePixel  = 0
 track.Parent           = speedCard
@@ -389,29 +401,32 @@ local function setFly(state)
     flyEnabled = state
     if state then
         enableFly()
-        -- Card hijau
-        tw(flyCard, 0.2, {BackgroundColor3 = T.GREEN_BG})
-        -- Badge ON hijau
-        tw(badge, 0.2, {BackgroundColor3 = Color3.fromRGB(15, 45, 25), TextColor3 = T.GREEN})
-        badge.Text = "ON"
-        -- Stroke badge ganti hijau
-        local bs = badge:FindFirstChildOfClass("UIStroke")
-        if bs then tw(bs, 0.2, {Color = T.GREEN}) end
+        tw(flyCard, 0.2, {BackgroundColor3 = T.BG_CARD_ON})
+        tw(flyBar,  0.2, {BackgroundColor3 = T.GREEN})
+        tw(flyPill, 0.2, {BackgroundColor3 = T.GREEN_PILL, TextColor3 = Color3.fromRGB(255,255,255)})
+        flyPill.Text  = "ON"
+        flyDesc.TextColor3 = T.TEXT_ON
+        flyDesc.Text  = "Flying active!"
     else
         disableFly()
         tw(flyCard, 0.2, {BackgroundColor3 = T.BG_CARD})
-        tw(badge, 0.2, {BackgroundColor3 = Color3.fromRGB(45, 20, 20), TextColor3 = T.RED})
-        badge.Text = "OFF"
-        local bs = badge:FindFirstChildOfClass("UIStroke")
-        if bs then tw(bs, 0.2, {Color = T.RED}) end
+        tw(flyBar,  0.2, {BackgroundColor3 = T.LEFT_BAR})
+        tw(flyPill, 0.2, {BackgroundColor3 = T.GRAY_PILL, TextColor3 = T.TEXT_MUTED})
+        flyPill.Text  = "OFF"
+        flyDesc.TextColor3 = T.TEXT_MUTED
+        flyDesc.Text  = "WASD + Space / Ctrl"
     end
 end
 
+-- Klik card atau pill = toggle
 flyCard.InputBegan:Connect(function(i)
     if i.UserInputType == Enum.UserInputType.MouseButton1
     or i.UserInputType == Enum.UserInputType.Touch then
         setFly(not flyEnabled)
     end
+end)
+flyPill.MouseButton1Click:Connect(function()
+    setFly(not flyEnabled)
 end)
 
 -- =========================================================
@@ -434,21 +449,18 @@ track.InputBegan:Connect(function(i)
         updateSlider(i.Position.X)
     end
 end)
-
 thumb.InputBegan:Connect(function(i)
     if i.UserInputType == Enum.UserInputType.MouseButton1
     or i.UserInputType == Enum.UserInputType.Touch then
         sliding = true
     end
 end)
-
 UserInputService.InputEnded:Connect(function(i)
     if i.UserInputType == Enum.UserInputType.MouseButton1
     or i.UserInputType == Enum.UserInputType.Touch then
         sliding = false
     end
 end)
-
 UserInputService.InputChanged:Connect(function(i)
     if not sliding then return end
     if i.UserInputType == Enum.UserInputType.MouseMovement
@@ -461,35 +473,36 @@ end)
 -- OPEN / CLOSE
 -- =========================================================
 local openBtn = Instance.new("TextButton")
-openBtn.Size             = UDim2.new(0, 40, 0, 40)
+openBtn.Size             = UDim2.new(0, 44, 0, 44)
 openBtn.Position         = UDim2.new(0.02, 0, 0.28, 0)
 openBtn.BackgroundColor3 = T.BG_DARK
 openBtn.Text             = "🪂"
-openBtn.TextSize         = 20
+openBtn.TextSize         = 22
 openBtn.Font             = Enum.Font.GothamBold
 openBtn.Visible          = false
 openBtn.BorderSizePixel  = 0
 openBtn.Parent           = gui
-corner(openBtn, 12)
+corner(openBtn, 14)
 stroke(openBtn, T.ACCENT, 2)
 makeDraggable(openBtn)
 
+local FULL_H = 196
+
 closeBtn.MouseButton1Click:Connect(function()
-    tw(frame, 0.2, {Size = UDim2.new(0, 185, 0, 0)})
+    tw(frame, 0.2, {Size = UDim2.new(0, 220, 0, 0)})
     task.delay(0.2, function()
         frame.Visible   = false
         openBtn.Visible = true
     end)
 end)
-
 openBtn.MouseButton1Click:Connect(function()
     frame.Visible = true
-    frame.Size    = UDim2.new(0, 185, 0, 0)
-    tw(frame, 0.25, {Size = UDim2.new(0, 185, 0, 172)})
+    frame.Size    = UDim2.new(0, 220, 0, 0)
+    tw(frame, 0.25, {Size = UDim2.new(0, 220, 0, FULL_H)})
     openBtn.Visible = false
 end)
 
 -- Animasi buka pertama kali
-tw(frame, 0.3, {Size = UDim2.new(0, 185, 0, 172)})
+tw(frame, 0.3, {Size = UDim2.new(0, 220, 0, FULL_H)})
 
-print("[TIOO] Fly loaded! Speed: " .. flySpeed)
+print("[TIOO] Fly loaded!")
