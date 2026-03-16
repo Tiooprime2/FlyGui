@@ -99,38 +99,44 @@ end
 -- =========================================================
 local function enableFly()
     if flyConn then flyConn:Disconnect() end
-    hum.PlatformStand = true
 
     flyConn = RunService.RenderStepped:Connect(function(dt)
         if not flyEnabled then return end
-        local spd = flySpeed
-        local cam = workspace.CurrentCamera
 
-        local look  = cam.CFrame.LookVector
-        local right = cam.CFrame.RightVector
+        -- Cari karakter & HRP yang sedang aktif saat ini
+        local currentChar = lp.Character
+        if not currentChar then return end
+        local currentHRP = currentChar:FindFirstChild("HumanoidRootPart")
+        local currentHum = currentChar:FindFirstChild("Humanoid")
 
-        -- Hilangkan komponen Y supaya hanya horizontal
-        look  = Vector3.new(look.X,  0, look.Z).Unit
-        right = Vector3.new(right.X, 0, right.Z).Unit
+        if currentHRP and currentHum then
+            currentHum.PlatformStand = true -- Pastikan tetap melayang
 
-        -- Ambil input langsung dari keyboard (fix arah terbalik)
-        local inputX = (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0)
-                     - (UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0)
-        local inputZ = (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0)
-                     - (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
+            local spd = flySpeed
+            local cam = workspace.CurrentCamera
+            local look  = cam.CFrame.LookVector
+            local right = cam.CFrame.RightVector
 
-        local dir = right * inputX + look * (-inputZ)
+            look  = Vector3.new(look.X, 0, look.Z).Unit
+            right = Vector3.new(right.X, 0, right.Z).Unit
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space)       then dir += Vector3.yAxis end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.yAxis end
+            local inputX = (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0)
+                         - (UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0)
+            local inputZ = (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0)
+                         - (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
 
-        if dir.Magnitude > 0 then
-            hrp.CFrame = hrp.CFrame + dir.Unit * spd * dt
+            local dir = right * inputX + look * (-inputZ)
+
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space)       then dir += Vector3.yAxis end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.yAxis end
+
+            if dir.Magnitude > 0 then
+                currentHRP.CFrame = currentHRP.CFrame + dir.Unit * spd * dt
+            end
+
+            currentHRP.AssemblyLinearVelocity  = Vector3.new(0, 0, 0)
+            currentHRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
         end
-
-        -- Freeze physics supaya tidak jatuh
-        hrp.AssemblyLinearVelocity  = Vector3.zero
-        hrp.AssemblyAngularVelocity = Vector3.zero
     end)
 end
 
