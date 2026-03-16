@@ -1,212 +1,259 @@
 -- =========================================================
--- TIOO Fly Script
+-- TIOO Fly Script - Roblox
 -- by Tiooprime2
+-- Executor: Delta / Codex
 -- =========================================================
 
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local lp   = Players.LocalPlayer
+local char = lp.Character or lp.CharacterAdded:Wait()
+local hrp  = char:WaitForChild("HumanoidRootPart")
+local hum  = char:WaitForChild("Humanoid")
+
 local flyEnabled = false
-local flySpeed   = 10
-local dragging   = false
-local dragOffX   = 0
-local dragOffY   = 0
-
--- GUI position
-local guiX = 20
-local guiY = 80
-
--- GUI size
-local W  = 160
-local H  = 110
-
--- Colors (ARGB)
-local C_BG       = 0xE0000000  -- hitam transparan
-local C_HEADER   = 0xFF141414  -- header gelap
-local C_GREEN    = 0xFF55FF55  -- hijau aktif
-local C_RED      = 0xFFFF5555  -- merah nonaktif
-local C_WHITE    = 0xFFFFFFFF
-local C_GRAY     = 0xFFAAAAAA
-local C_PINK     = 0xFFFF77CC  -- slider handle
-local C_TRACK    = 0xFF333333  -- slider track
-local C_FILL     = 0xFF55FF55  -- slider fill
-local C_DIVIDER  = 0xFF333333
-local C_HOVER    = 0x18FFFFFF
-local C_BTN_ON   = 0xFF1A3D1A  -- bg tombol ON
-local C_BTN_OFF  = 0xFF3D1A1A  -- bg tombol OFF
+local flySpeed   = 50
+local bodyVel, bodyGyro
 
 -- =========================================================
 -- FLY LOGIC
 -- =========================================================
 
-local function doFly()
-    if not flyEnabled then return end
-    local lp = GetLocalPlayer()
-    if not lp then return end
+local function enableFly()
+    if bodyVel  then bodyVel:Destroy()  end
+    if bodyGyro then bodyGyro:Destroy() end
 
-    local spd = flySpeed * 0.1  -- scale speed
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+    bodyGyro.P = 1e4
+    bodyGyro.Parent = hrp
 
-    if IsKeyDown(0x26) or IsKeyDown(0x57) then  -- UP / W
-        lp.y = lp.y - spd
-    end
-    if IsKeyDown(0x28) or IsKeyDown(0x53) then  -- DOWN / S
-        lp.y = lp.y + spd
-    end
-    if IsKeyDown(0x25) or IsKeyDown(0x41) then  -- LEFT / A
-        lp.x = lp.x - spd
-    end
-    if IsKeyDown(0x27) or IsKeyDown(0x44) then  -- RIGHT / D
-        lp.x = lp.x + spd
-    end
+    bodyVel = Instance.new("BodyVelocity")
+    bodyVel.Velocity = Vector3.zero
+    bodyVel.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    bodyVel.Parent = hrp
 
-    -- Cancel gravity
-    lp.velocityY = 0
-    lp.velocityX = 0
+    hum.PlatformStand = true
 end
 
--- =========================================================
--- GUI RENDER
--- =========================================================
-
-local function drawRect(x, y, w, h, color)
-    DrawRect(x, y, x + w, y + h, color)
+local function disableFly()
+    if bodyVel  then bodyVel:Destroy();  bodyVel  = nil end
+    if bodyGyro then bodyGyro:Destroy(); bodyGyro = nil end
+    hum.PlatformStand = false
 end
 
-local function drawText(text, x, y, color, size)
-    DrawText(text, x, y, color, size or 10)
-end
+RunService.Heartbeat:Connect(function()
+    if not flyEnabled or not bodyVel or not bodyGyro then return end
 
-local function renderGUI()
-    -- BG
-    drawRect(guiX, guiY, W, H, C_BG)
+    local cam = workspace.CurrentCamera
+    local dir = Vector3.zero
 
-    -- Border
-    DrawRect(guiX,       guiY,       guiX+W,   guiY+1,   C_DIVIDER)
-    DrawRect(guiX,       guiY+H-1,   guiX+W,   guiY+H,   C_DIVIDER)
-    DrawRect(guiX,       guiY,       guiX+1,   guiY+H,   C_DIVIDER)
-    DrawRect(guiX+W-1,   guiY,       guiX+W,   guiY+H,   C_DIVIDER)
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + cam.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - cam.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - cam.CFrame.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + cam.CFrame.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space)       then dir = dir + Vector3.new(0,1,0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir = dir - Vector3.new(0,1,0) end
 
-    -- Header
-    drawRect(guiX, guiY, W, 22, C_HEADER)
-    drawText("TIOO Fly", guiX + 8, guiY + 6, C_WHITE, 11)
-    -- Green underline header
-    drawRect(guiX, guiY+19, W, 3, C_GREEN)
+    bodyVel.Velocity = (dir.Magnitude > 0 and dir.Unit or Vector3.zero) * flySpeed
+    bodyGyro.CFrame  = cam.CFrame
+end)
 
-    -- ON/OFF Button
-    local btnY   = guiY + 30
-    local btnX   = guiX + 10
-    local btnW   = W - 20
-    local btnH   = 20
-    local btnCol = flyEnabled and C_BTN_ON or C_BTN_OFF
-    local btnTxt = flyEnabled and "ON" or "OFF"
-    local btnTxtCol = flyEnabled and C_GREEN or C_RED
-
-    drawRect(btnX, btnY, btnW, btnH, btnCol)
-    -- Border tombol
-    DrawRect(btnX,        btnY,        btnX+btnW,   btnY+1,    flyEnabled and C_GREEN or C_RED)
-    DrawRect(btnX,        btnY+btnH-1, btnX+btnW,   btnY+btnH, flyEnabled and C_GREEN or C_RED)
-    DrawRect(btnX,        btnY,        btnX+1,      btnY+btnH, flyEnabled and C_GREEN or C_RED)
-    DrawRect(btnX+btnW-1, btnY,        btnX+btnW,   btnY+btnH, flyEnabled and C_GREEN or C_RED)
-
-    local tw = GetTextWidth(btnTxt, 11)
-    drawText(btnTxt, btnX + btnW/2 - tw/2, btnY + 5, btnTxtCol, 11)
-
-    -- Slider label + value
-    local slLabelY = guiY + 60
-    drawText("Speed", guiX + 10, slLabelY, C_GRAY, 10)
-    local valTxt = tostring(flySpeed)
-    local vw = GetTextWidth(valTxt, 10)
-    drawText(valTxt, guiX + W - 10 - vw, slLabelY, C_PINK, 10)
-
-    -- Slider track
-    local tX1 = guiX + 10
-    local tX2 = guiX + W - 10
-    local tY  = guiY + 76
-    drawRect(tX1, tY, tX2 - tX1, 3, C_TRACK)
-
-    -- Slider fill
-    local ratio = (flySpeed - 1) / (500 - 1)
-    local fillW = math.floor(ratio * (tX2 - tX1))
-    drawRect(tX1, tY, fillW, 3, C_FILL)
-
-    -- Slider thumb (pink)
-    local thumbX = tX1 + fillW - 4
-    drawRect(thumbX, tY - 5, 8, 13, C_PINK)
-
-    -- Bottom hint
-    drawText("Drag to move", guiX + W/2 - 28, guiY + H - 14, C_GRAY, 9)
-end
+lp.CharacterAdded:Connect(function(c)
+    char = c
+    hrp  = c:WaitForChild("HumanoidRootPart")
+    hum  = c:WaitForChild("Humanoid")
+    flyEnabled = false
+    disableFly()
+end)
 
 -- =========================================================
--- INPUT HANDLING
+-- GUI
 -- =========================================================
 
-local sliderDragging = false
+local guiParent = gethui and gethui() or game:GetService("CoreGui")
+local old = guiParent:FindFirstChild("TIOOFly")
+if old then old:Destroy() end
 
-AddHook(function(x, y, btn, state)
-    -- state 1 = press, 0 = release
-    local btnY  = guiY + 30
-    local btnX  = guiX + 10
-    local btnW  = W - 20
-    local btnH  = 20
+local gui = Instance.new("ScreenGui")
+gui.Name          = "TIOOFly"
+gui.ResetOnSpawn  = false
+gui.Parent        = guiParent
 
-    local tX1   = guiX + 10
-    local tX2   = guiX + W - 10
-    local tY    = guiY + 76
+local frame = Instance.new("Frame")
+frame.Size                = UDim2.new(0, 160, 0, 115)
+frame.Position            = UDim2.new(0, 20, 0, 80)
+frame.BackgroundColor3    = Color3.fromRGB(0, 0, 0)
+frame.BackgroundTransparency = 0.12
+frame.BorderSizePixel     = 0
+frame.Active              = true
+frame.Draggable           = true
+frame.Parent              = gui
 
-    if state == 1 then
-        -- Klik tombol ON/OFF
-        if x >= btnX and x <= btnX+btnW and y >= btnY and y <= btnY+btnH then
-            flyEnabled = not flyEnabled
-            return true
-        end
+local stroke = Instance.new("UIStroke")
+stroke.Color     = Color3.fromRGB(51, 51, 51)
+stroke.Thickness = 1
+stroke.Parent    = frame
 
-        -- Klik slider
-        if x >= tX1 and x <= tX2 and y >= tY-6 and y <= tY+9 then
-            sliderDragging = true
-            local ratio = (x - tX1) / (tX2 - tX1)
-            flySpeed = math.floor(1 + ratio * (500 - 1))
-            flySpeed = math.max(1, math.min(500, flySpeed))
-            return true
-        end
+-- Header
+local header = Instance.new("Frame")
+header.Size             = UDim2.new(1, 0, 0, 22)
+header.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
+header.BorderSizePixel  = 0
+header.Parent           = frame
 
-        -- Drag header
-        if x >= guiX and x <= guiX+W and y >= guiY and y <= guiY+22 then
-            dragging = true
-            dragOffX = x - guiX
-            dragOffY = y - guiY
-            return true
-        end
+local title = Instance.new("TextLabel")
+title.Text             = "TIOO Fly"
+title.Size             = UDim2.new(1, -8, 1, 0)
+title.Position         = UDim2.new(0, 8, 0, 0)
+title.BackgroundTransparency = 1
+title.TextColor3       = Color3.fromRGB(255, 255, 255)
+title.TextXAlignment   = Enum.TextXAlignment.Left
+title.Font             = Enum.Font.GothamBold
+title.TextSize         = 11
+title.Parent           = header
 
-    elseif state == 0 then
-        dragging      = false
-        sliderDragging = false
+local underline = Instance.new("Frame")
+underline.Size             = UDim2.new(1, 0, 0, 3)
+underline.Position         = UDim2.new(0, 0, 1, -3)
+underline.BackgroundColor3 = Color3.fromRGB(85, 255, 85)
+underline.BorderSizePixel  = 0
+underline.Parent           = header
+
+-- ON/OFF Button
+local btn = Instance.new("TextButton")
+btn.Size             = UDim2.new(1, -20, 0, 22)
+btn.Position         = UDim2.new(0, 10, 0, 30)
+btn.BackgroundColor3 = Color3.fromRGB(61, 26, 26)
+btn.BorderSizePixel  = 0
+btn.Text             = "OFF"
+btn.TextColor3       = Color3.fromRGB(255, 85, 85)
+btn.Font             = Enum.Font.GothamBold
+btn.TextSize         = 11
+btn.Parent           = frame
+
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 3)
+
+local btnStroke = Instance.new("UIStroke")
+btnStroke.Color     = Color3.fromRGB(255, 85, 85)
+btnStroke.Thickness = 1
+btnStroke.Parent    = btn
+
+-- Speed label
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size             = UDim2.new(0.5, 0, 0, 14)
+speedLabel.Position         = UDim2.new(0, 10, 0, 62)
+speedLabel.BackgroundTransparency = 1
+speedLabel.Text             = "Speed"
+speedLabel.TextColor3       = Color3.fromRGB(170, 170, 170)
+speedLabel.TextXAlignment   = Enum.TextXAlignment.Left
+speedLabel.Font             = Enum.Font.Gotham
+speedLabel.TextSize         = 10
+speedLabel.Parent           = frame
+
+local speedVal = Instance.new("TextLabel")
+speedVal.Size             = UDim2.new(0.5, -10, 0, 14)
+speedVal.Position         = UDim2.new(0.5, 0, 0, 62)
+speedVal.BackgroundTransparency = 1
+speedVal.Text             = tostring(flySpeed)
+speedVal.TextColor3       = Color3.fromRGB(255, 119, 204)
+speedVal.TextXAlignment   = Enum.TextXAlignment.Right
+speedVal.Font             = Enum.Font.GothamBold
+speedVal.TextSize         = 10
+speedVal.Parent           = frame
+
+-- Slider
+local track = Instance.new("Frame")
+track.Size             = UDim2.new(1, -20, 0, 3)
+track.Position         = UDim2.new(0, 10, 0, 82)
+track.BackgroundColor3 = Color3.fromRGB(51, 51, 51)
+track.BorderSizePixel  = 0
+track.Parent           = frame
+Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+
+local fill = Instance.new("Frame")
+fill.Size             = UDim2.new((flySpeed-1)/499, 0, 1, 0)
+fill.BackgroundColor3 = Color3.fromRGB(85, 255, 85)
+fill.BorderSizePixel  = 0
+fill.Parent           = track
+Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+
+local thumb = Instance.new("Frame")
+thumb.Size            = UDim2.new(0, 10, 0, 16)
+thumb.AnchorPoint     = Vector2.new(0.5, 0.5)
+thumb.Position        = UDim2.new((flySpeed-1)/499, 0, 0.5, 0)
+thumb.BackgroundColor3 = Color3.fromRGB(255, 119, 204)
+thumb.BorderSizePixel = 0
+thumb.ZIndex          = 3
+thumb.Parent          = track
+Instance.new("UICorner", thumb).CornerRadius = UDim.new(0, 3)
+
+local hint = Instance.new("TextLabel")
+hint.Size             = UDim2.new(1, 0, 0, 12)
+hint.Position         = UDim2.new(0, 0, 1, -14)
+hint.BackgroundTransparency = 1
+hint.Text             = "WASD + Space / Ctrl"
+hint.TextColor3       = Color3.fromRGB(80, 80, 80)
+hint.Font             = Enum.Font.Gotham
+hint.TextSize         = 9
+hint.Parent           = frame
+
+-- =========================================================
+-- BUTTON LOGIC
+-- =========================================================
+
+btn.MouseButton1Click:Connect(function()
+    flyEnabled = not flyEnabled
+    if flyEnabled then
+        enableFly()
+        btn.Text             = "ON"
+        btn.TextColor3       = Color3.fromRGB(85, 255, 85)
+        btn.BackgroundColor3 = Color3.fromRGB(26, 61, 26)
+        btnStroke.Color      = Color3.fromRGB(85, 255, 85)
+    else
+        disableFly()
+        btn.Text             = "OFF"
+        btn.TextColor3       = Color3.fromRGB(255, 85, 85)
+        btn.BackgroundColor3 = Color3.fromRGB(61, 26, 26)
+        btnStroke.Color      = Color3.fromRGB(255, 85, 85)
     end
-
-end, "OnMouseEvent")
-
-AddHook(function(x, y)
-    if dragging then
-        guiX = x - dragOffX
-        guiY = y - dragOffY
-    end
-    if sliderDragging then
-        local tX1 = guiX + 10
-        local tX2 = guiX + W - 10
-        local ratio = (x - tX1) / (tX2 - tX1)
-        flySpeed = math.floor(1 + ratio * (500 - 1))
-        flySpeed = math.max(1, math.min(500, flySpeed))
-    end
-end, "OnMouseMove")
+end)
 
 -- =========================================================
--- MAIN HOOKS
+-- SLIDER LOGIC
 -- =========================================================
 
-AddHook(function()
-    doFly()
-end, "OnTick")
+local sliding = false
 
-AddHook(function()
-    renderGUI()
-end, "OnRender")
+thumb.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1
+    or i.UserInputType == Enum.UserInputType.Touch then
+        sliding = true
+    end
+end)
 
--- Startup message
-SendPacket(2, "action|input\n|text|`2[TIOO]`0 Fly loaded! Speed: `b" .. flySpeed)
+UserInputService.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1
+    or i.UserInputType == Enum.UserInputType.Touch then
+        sliding = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(i)
+    if not sliding then return end
+    if i.UserInputType ~= Enum.UserInputType.MouseMovement
+    and i.UserInputType ~= Enum.UserInputType.Touch then return end
+
+    local rel = math.clamp(
+        (i.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X,
+        0, 1
+    )
+    flySpeed       = math.floor(1 + rel * 499)
+    speedVal.Text  = tostring(flySpeed)
+    fill.Size      = UDim2.new(rel, 0, 1, 0)
+    thumb.Position = UDim2.new(rel, 0, 0.5, 0)
+end)
+
+print("[TIOO] Fly loaded! Speed: " .. flySpeed)
