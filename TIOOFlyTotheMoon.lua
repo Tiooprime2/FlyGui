@@ -104,7 +104,6 @@ local function enableFly()
     flyConn = RunService.RenderStepped:Connect(function(dt)
         if not flyEnabled then return end
         local spd = flySpeed
-        local moveDir = hum.MoveDirection
         local cam = workspace.CurrentCamera
 
         local look  = cam.CFrame.LookVector
@@ -114,7 +113,13 @@ local function enableFly()
         look  = Vector3.new(look.X,  0, look.Z).Unit
         right = Vector3.new(right.X, 0, right.Z).Unit
 
-        local dir = right * moveDir.X + look * moveDir.Z
+        -- Ambil input langsung dari keyboard (fix arah terbalik)
+        local inputX = (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0)
+                     - (UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0)
+        local inputZ = (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0)
+                     - (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
+
+        local dir = right * inputX + look * (-inputZ)
 
         if UserInputService:IsKeyDown(Enum.KeyCode.Space)       then dir += Vector3.yAxis end
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.yAxis end
@@ -124,10 +129,6 @@ local function enableFly()
         end
 
         -- Freeze physics supaya tidak jatuh
-        hrp.AssemblyLinearVelocity  = Vector3.zero
-        hrp.AssemblyAngularVelocity = Vector3.zero
-
-        -- Freeze physics
         hrp.AssemblyLinearVelocity  = Vector3.zero
         hrp.AssemblyAngularVelocity = Vector3.zero
     end)
