@@ -9,7 +9,6 @@ local UserInputService = game:GetService("UserInputService")
 
 local lp = Players.LocalPlayer
 
--- State (diakses dari luar via module)
 local Fly = {}
 Fly.enabled = false
 Fly.speed   = 50
@@ -18,66 +17,73 @@ local flyConn = nil
 local flyBV   = nil
 
 -- =========================================================
+-- SETUP BODY VELOCITY HELPER
+-- =========================================================
+local function setupBV(part)
+    if flyBV then flyBV:Destroy() end
+    local bv       = Instance.new("BodyVelocity")
+    bv.Name        = "TIOO_FlyForce"
+    bv.Velocity    = Vector3.zero
+    bv.MaxForce    = Vector3.new(9e9, 9e9, 9e9)  -- Cukup kuat abaikan berat karakter
+    bv.P           = 1250                          -- Respon instan
+    bv.Parent      = part
+    flyBV = bv
+end
+
+-- =========================================================
 -- ENABLE
 -- =========================================================
 function Fly.enable()
     if flyConn then flyConn:Disconnect() end
 
-    local currentChar = lp.Character
-    if not currentChar then return end
-    local currentHRP = currentChar:FindFirstChild("HumanoidRootPart")
-    local currentHum = currentChar:FindFirstChild("Humanoid")
-    if not currentHRP or not currentHum then return end
-
-    currentHum.PlatformStand = true
-
-    -- Bersihkan BV lama
-    if flyBV then flyBV:Destroy() end
-    local bv        = Instance.new("BodyVelocity")
-    bv.Velocity     = Vector3.zero
-    bv.MaxForce     = Vector3.new(1e5, 1e5, 1e5)
-    bv.P            = 1e4
-    bv.Parent       = currentHRP
-    flyBV = bv
+    -- Setup BV di awal sebelum loop
+    local char = lp.Character
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then setupBV(hrp) end
 
     flyConn = RunService.RenderStepped:Connect(function(dt)
         if not Fly.enabled then return end
 
-        local char2 = lp.Character
-        if not char2 then return end
-        local hrp2  = char2:FindFirstChild("HumanoidRootPart")
-        local hum2  = char2:FindFirstChild("Humanoid")
-        if not hrp2 or not hum2 then return end
+        local currentChar = lp.Character
+        local currentHRP  = currentChar and currentChar:FindFirstChild("HumanoidRootPart")
+        local currentHum  = currentChar and currentChar:FindFirstChild("Humanoid")
+        if not currentHRP or not currentHum then return end
 
-        -- Pindahkan BV kalau karakter respawn
-        if flyBV and flyBV.Parent ~= hrp2 then
-            flyBV:Destroy()
-            local newBV     = Instance.new("BodyVelocity")
-            newBV.MaxForce  = Vector3.new(1e5, 1e5, 1e5)
-            newBV.P         = 1e4
-            newBV.Parent    = hrp2
-            flyBV = newBV
+        -- Pastikan PlatformStand aktif tiap frame
+        currentHum.PlatformStand = true
+
+        -- Rebuild BV kalau hilang atau pindah karakter (respawn)
+        if not flyBV or flyBV.Parent ~= currentHRP then
+            setupBV(currentHRP)
         end
-
-        hum2.PlatformStand = true
 
         local cam   = workspace.CurrentCamera
-        local look  = Vector3.new(cam.CFrame.LookVector.X,  0, cam.CFrame.LookVector.Z).Unit
-        local right = Vector3.new(cam.CFrame.RightVector.X, 0, cam.CFrame.RightVector.Z).Unit
+        local look  = cam.CFrame.LookVector
+        local right = cam.CFrame.RightVector
 
-        local inputX = (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0)
-                     - (UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0)
-        local inputZ = (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0)
-                     - (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
+        -- Horizontal movement relatif kamera
+        local moveDir =
+            (right * (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or
+                     (UserInputService:IsKeyDown(Enum.KeyCode.A) and -1 or 0))) +
+            (Vector3.new(look.X, 0, look.Z).Unit * (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or
+                                                    (UserInputService:IsKeyDown(Enum.KeyCode.S) and -1 or 0)))
 
-        local dir = right * inputX + look * (-inputZ)
+        -- Vertikal
+        local upDown = (UserInputService:IsKeyDown(Enum.KeyCode.Space)       and 1 or 0)
+                     - (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and 1 or 0)
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space)       then dir += Vector3.yAxis end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.yAxis end
+        local finalDir = moveDir + (Vector3.yAxis * upDown)
 
         if flyBV then
-            flyBV.Velocity = (dir.Magnitude > 0) and (dir.Unit * Fly.speed) or Vector3.zero
+            if finalDir.Magnitude > 0 then
+                flyBV.Velocity = finalDir.Unit * Fly.speed
+            else
+                flyBV.Velocity = Vector3.zero  -- Hover diam
+            end
         end
+
+        -- Paksa physics Roblox tidak bentrok dengan BV
+        currentHRP.AssemblyLinearVelocity = Vector3.zero
     end)
 end
 
@@ -107,7 +113,7 @@ function Fly.toggle()
     return Fly.enabled
 end
 
--- Auto cleanup kalau respawn
+-- Auto cleanup saat respawn
 lp.CharacterAdded:Connect(function()
     Fly.enabled = false
     Fly.disable()
