@@ -1,6 +1,7 @@
 -- =========================================================
 -- TIOO Fly - Core Fly Logic
 -- by Tiooprime2
+-- PC + Mobile Compatible
 -- =========================================================
 
 local Players          = game:GetService("Players")
@@ -17,16 +18,16 @@ local flyConn = nil
 local flyBV   = nil
 
 -- =========================================================
--- SETUP BODY VELOCITY HELPER
+-- SETUP BODY VELOCITY
 -- =========================================================
 local function setupBV(part)
     if flyBV then flyBV:Destroy() end
-    local bv       = Instance.new("BodyVelocity")
-    bv.Name        = "TIOO_FlyForce"
-    bv.Velocity    = Vector3.zero
-    bv.MaxForce    = Vector3.new(9e9, 9e9, 9e9)  -- Cukup kuat abaikan berat karakter
-    bv.P           = 1250                          -- Respon instan
-    bv.Parent      = part
+    local bv    = Instance.new("BodyVelocity")
+    bv.Name     = "TIOO_FlyForce"
+    bv.Velocity = Vector3.zero
+    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    bv.P        = 1250
+    bv.Parent   = part
     flyBV = bv
 end
 
@@ -36,7 +37,6 @@ end
 function Fly.enable()
     if flyConn then flyConn:Disconnect() end
 
-    -- Setup BV di awal sebelum loop
     local char = lp.Character
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
     if hrp then setupBV(hrp) end
@@ -49,41 +49,48 @@ function Fly.enable()
         local currentHum  = currentChar and currentChar:FindFirstChild("Humanoid")
         if not currentHRP or not currentHum then return end
 
-        -- Pastikan PlatformStand aktif tiap frame
         currentHum.PlatformStand = true
 
-        -- Rebuild BV kalau hilang atau pindah karakter (respawn)
+        -- Rebuild BV kalau respawn / hilang
         if not flyBV or flyBV.Parent ~= currentHRP then
             setupBV(currentHRP)
         end
 
-        local cam   = workspace.CurrentCamera
-        local look  = cam.CFrame.LookVector
-        local right = cam.CFrame.RightVector
+        local cam = workspace.CurrentCamera
 
-        -- Horizontal movement relatif kamera
-        local moveDir =
-            (right * (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or
-                     (UserInputService:IsKeyDown(Enum.KeyCode.A) and -1 or 0))) +
-            (Vector3.new(look.X, 0, look.Z).Unit * (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or
-                                                    (UserInputService:IsKeyDown(Enum.KeyCode.S) and -1 or 0)))
+        -- ── HORIZONTAL MOVEMENT ──────────────────────────────
+        -- Pakai MoveDirection (works PC + Mobile joystick!)
+        -- MoveDirection adalah world-space, kita project ke arah kamera
+        local rawMove = currentHum.MoveDirection  -- Vector3, magnitude 0~1
 
-        -- Vertikal
+        local camCF  = cam.CFrame
+        local look   = Vector3.new(camCF.LookVector.X,  0, camCF.LookVector.Z)
+        local right  = Vector3.new(camCF.RightVector.X, 0, camCF.RightVector.Z)
+
+        -- Normalize hanya kalau tidak zero (hindari NaN)
+        if look.Magnitude  > 0 then look  = look.Unit  end
+        if right.Magnitude > 0 then right = right.Unit end
+
+        -- Project input joystick/WASD ke arah kamera
+        -- rawMove.X = strafe (kiri/kanan), rawMove.Z = maju/mundur
+        local hDir = right * rawMove.X + look * (-rawMove.Z)
+
+        -- ── VERTICAL MOVEMENT ────────────────────────────────
+        -- PC: Space / LeftControl
+        -- Mobile: bisa tambah tombol UI sendiri nanti
         local upDown = (UserInputService:IsKeyDown(Enum.KeyCode.Space)       and 1 or 0)
                      - (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and 1 or 0)
 
-        local finalDir = moveDir + (Vector3.yAxis * upDown)
+        local finalDir = hDir + Vector3.yAxis * upDown
 
+        -- ── APPLY VELOCITY ───────────────────────────────────
         if flyBV then
             if finalDir.Magnitude > 0 then
                 flyBV.Velocity = finalDir.Unit * Fly.speed
             else
-                flyBV.Velocity = Vector3.zero  -- Hover diam
+                flyBV.Velocity = Vector3.zero  -- Hover stabil
             end
         end
-
-        -- Paksa physics Roblox tidak bentrok dengan BV
-        currentHRP.AssemblyLinearVelocity = Vector3.zero
     end)
 end
 
@@ -119,5 +126,5 @@ lp.CharacterAdded:Connect(function()
     Fly.disable()
 end)
 
-print("[TIOO] fly.lua loaded!")
+print("[TIOO] fly.lua loaded! (PC + Mobile)")
 return Fly
