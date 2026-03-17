@@ -16,6 +16,7 @@ local hum  = char:WaitForChild("Humanoid")
 local flyEnabled = false
 local flySpeed   = 50
 local flyConn    = nil
+local flyBV      = nil  -- BodyVelocity instance
 
 -- =========================================================
 -- THEME
@@ -100,49 +101,75 @@ end
 local function enableFly()
     if flyConn then flyConn:Disconnect() end
 
+    local currentChar = lp.Character
+    if not currentChar then return end
+    local currentHRP = currentChar:FindFirstChild("HumanoidRootPart")
+    local currentHum = currentChar:FindFirstChild("Humanoid")
+    if not currentHRP or not currentHum then return end
+
+    currentHum.PlatformStand = true
+
+    if flyBV then flyBV:Destroy() end
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Velocity    = Vector3.zero
+    bv.MaxForce    = Vector3.new(1e5, 1e5, 1e5)
+    bv.P           = 1e4
+    bv.Parent      = currentHRP
+    flyBV = bv
+
     flyConn = RunService.RenderStepped:Connect(function(dt)
         if not flyEnabled then return end
 
-        -- Cari karakter & HRP yang sedang aktif saat ini
-        local currentChar = lp.Character
-        if not currentChar then return end
-        local currentHRP = currentChar:FindFirstChild("HumanoidRootPart")
-        local currentHum = currentChar:FindFirstChild("Humanoid")
+        local char2 = lp.Character
+        if not char2 then return end
+        local hrp2 = char2:FindFirstChild("HumanoidRootPart")
+        local hum2 = char2:FindFirstChild("Humanoid")
+        if not hrp2 or not hum2 then return end
 
-        if currentHRP and currentHum then
-            currentHum.PlatformStand = true -- Pastikan tetap melayang
+        if flyBV and flyBV.Parent ~= hrp2 then
+            flyBV:Destroy()
+            local newBV = Instance.new("BodyVelocity")
+            newBV.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+            newBV.P        = 1e4
+            newBV.Parent   = hrp2
+            flyBV = newBV
+        end
 
-            local spd = flySpeed
-            local cam = workspace.CurrentCamera
-            local look  = cam.CFrame.LookVector
-            local right = cam.CFrame.RightVector
+        hum2.PlatformStand = true
 
-            look  = Vector3.new(look.X, 0, look.Z).Unit
-            right = Vector3.new(right.X, 0, right.Z).Unit
+        local cam   = workspace.CurrentCamera
+        local look  = Vector3.new(cam.CFrame.LookVector.X,  0, cam.CFrame.LookVector.Z).Unit
+        local right = Vector3.new(cam.CFrame.RightVector.X, 0, cam.CFrame.RightVector.Z).Unit
 
-            local inputX = (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0)
-                         - (UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0)
-            local inputZ = (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0)
-                         - (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
+        local inputX = (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0)
+                     - (UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0)
+        local inputZ = (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0)
+                     - (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
 
-            local dir = right * inputX + look * (-inputZ)
+        local dir = right * inputX + look * (-inputZ)
 
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space)       then dir += Vector3.yAxis end
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.yAxis end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space)       then dir += Vector3.yAxis end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.yAxis end
 
+        if flyBV then
             if dir.Magnitude > 0 then
-                currentHRP.CFrame = currentHRP.CFrame + dir.Unit * spd * dt
+                flyBV.Velocity = dir.Unit * flySpeed
+            else
+                flyBV.Velocity = Vector3.zero
             end
-
-            currentHRP.AssemblyLinearVelocity  = Vector3.new(0, 0, 0)
-            currentHRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
         end
     end)
 end
 
 local function disableFly()
     if flyConn then flyConn:Disconnect(); flyConn = nil end
-    hum.PlatformStand = false
+    if flyBV   then flyBV:Destroy();      flyBV   = nil end
+    local currentChar = lp.Character
+    if currentChar then
+        local currentHum = currentChar:FindFirstChild("Humanoid")
+        if currentHum then currentHum.PlatformStand = false end
+    end
 end
 
 lp.CharacterAdded:Connect(function(c)
