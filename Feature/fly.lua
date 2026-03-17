@@ -1,11 +1,11 @@
 -- =========================================================
 -- TIOO Fly - Core Fly Logic
 -- by Tiooprime2
--- PC + Mobile Compatible (BodyGyro + BodyVelocity)
+-- Support R6 + R15 | PC + Mobile
 -- =========================================================
 
-local Players          = game:GetService("Players")
-local RunService       = game:GetService("RunService")
+local Players   = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local lp = Players.LocalPlayer
 
@@ -14,87 +14,126 @@ Fly.enabled = false
 Fly.speed   = 50
 
 local flyConn = nil
-local flyBV   = nil
 local flyBG   = nil
+local flyBV   = nil
 
 -- =========================================================
 -- ENABLE
 -- =========================================================
 function Fly.enable()
-    -- Cleanup dulu kalau ada sisa
-    Fly.disable()
+    Fly.disable() -- cleanup dulu
 
     local char = lp.Character
-    local hum  = char and char:FindFirstChildOfClass("Humanoid")
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not char or not hum or not root then return end
+    if not char then return end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+
+    -- Support R6 dan R15
+    local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+    if not torso then return end
 
     hum.PlatformStand = true
 
-    -- BodyGyro: bikin karakter menghadap arah kamera (stabil, tidak goyang)
+    -- Disable semua humanoid state (anti gravity / anti fall)
+    local states = {
+        Enum.HumanoidStateType.Climbing,
+        Enum.HumanoidStateType.FallingDown,
+        Enum.HumanoidStateType.Flying,
+        Enum.HumanoidStateType.Freefall,
+        Enum.HumanoidStateType.GettingUp,
+        Enum.HumanoidStateType.Jumping,
+        Enum.HumanoidStateType.Landed,
+        Enum.HumanoidStateType.Physics,
+        Enum.HumanoidStateType.PlatformStanding,
+        Enum.HumanoidStateType.Ragdoll,
+        Enum.HumanoidStateType.Running,
+        Enum.HumanoidStateType.RunningNoPhysics,
+        Enum.HumanoidStateType.Seated,
+        Enum.HumanoidStateType.StrafingNoPhysics,
+        Enum.HumanoidStateType.Swimming,
+    }
+    for _, state in ipairs(states) do
+        hum:SetStateEnabled(state, false)
+    end
+    hum:ChangeState(Enum.HumanoidStateType.Swimming)
+
+    -- BodyGyro: orientasi karakter ikut kamera
     local bg = Instance.new("BodyGyro")
     bg.P          = 9e4
     bg.MaxTorque  = Vector3.new(9e9, 9e9, 9e9)
-    bg.CFrame     = root.CFrame
-    bg.Parent     = root
+    bg.CFrame     = torso.CFrame
+    bg.Parent     = torso
     flyBG = bg
 
-    -- BodyVelocity: gerakkan karakter
+    -- BodyVelocity: gerak karakter
     local bv = Instance.new("BodyVelocity")
-    bv.Velocity  = Vector3.zero
+    bv.Velocity  = Vector3.new(0, 0.1, 0)
     bv.MaxForce  = Vector3.new(9e9, 9e9, 9e9)
-    bv.Parent    = root
+    bv.Parent    = torso
     flyBV = bv
+
+    -- Smooth speed acceleration
+    local currentSpeed = 0
+    local maxSpeed     = Fly.speed
+    local lastDir      = Vector3.zero
 
     flyConn = RunService.RenderStepped:Connect(function()
         if not Fly.enabled then return end
 
-        local currentChar = lp.Character
-        local currentHum  = currentChar and currentChar:FindFirstChildOfClass("Humanoid")
-        local currentRoot = currentChar and currentChar:FindFirstChild("HumanoidRootPart")
-        if not currentHum or not currentRoot then return end
+        local char2  = lp.Character
+        if not char2 then return end
+        local hum2   = char2:FindFirstChildOfClass("Humanoid")
+        if not hum2  then return end
 
-        -- Pastikan PlatformStand aktif terus
-        currentHum.PlatformStand = true
+        local torso2 = char2:FindFirstChild("UpperTorso") or char2:FindFirstChild("Torso")
+        if not torso2 then return end
 
-        -- Rebuild BG/BV kalau respawn / hilang
-        if not flyBG or flyBG.Parent ~= currentRoot then
-            if flyBG then flyBG:Destroy() end
-            local newBG = Instance.new("BodyGyro")
-            newBG.P         = 9e4
-            newBG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-            newBG.CFrame    = currentRoot.CFrame
-            newBG.Parent    = currentRoot
-            flyBG = newBG
-        end
-
-        if not flyBV or flyBV.Parent ~= currentRoot then
-            if flyBV then flyBV:Destroy() end
-            local newBV = Instance.new("BodyVelocity")
-            newBV.Velocity = Vector3.zero
-            newBV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-            newBV.Parent   = currentRoot
-            flyBV = newBV
-        end
+        hum2.PlatformStand = true
+        maxSpeed = Fly.speed
 
         local cam     = workspace.CurrentCamera
-        local look    = cam.CFrame.LookVector
-        local moveDir = currentHum.MoveDirection  -- PC + Mobile joystick
+        local camCF   = cam.CoordinateFrame
+        local moveDir = hum2.MoveDirection  -- works PC + mobile joystick!
 
-        -- Gyro ikutin arah kamera
-        flyBG.CFrame = cam.CFrame
+        -- Konversi MoveDirection ke ctrl f/b/l/r
+        local f = -moveDir.Z  -- maju
+        local b =  moveDir.Z  -- mundur  
+        local l = -moveDir.X  -- kiri
+        local r =  moveDir.X  -- kanan
 
-        -- Gerak pakai MoveDirection langsung (world-space, proven work)
-        -- Naik/turun dari Y komponen LookVector sesuai sudut kamera
-        if moveDir.Magnitude > 0 then
-            flyBV.Velocity = Vector3.new(
-                moveDir.X * Fly.speed,
-                look.Y    * Fly.speed * moveDir.Magnitude,  -- naik hanya kalau ada input
-                moveDir.Z * Fly.speed
-            )
+        local moving = (l + r ~= 0) or (f + b ~= 0)
+
+        -- Smooth acceleration / deceleration
+        if moving then
+            currentSpeed = currentSpeed + 0.5 + (currentSpeed / maxSpeed)
+            if currentSpeed > maxSpeed then
+                currentSpeed = maxSpeed
+            end
         else
-            flyBV.Velocity = Vector3.zero  -- Hover stabil
+            currentSpeed = currentSpeed - 1
+            if currentSpeed < 0 then currentSpeed = 0 end
         end
+
+        -- Set velocity
+        if moving then
+            local vel = ((camCF.LookVector * (f + b)) +
+                ((camCF * CFrame.new(l + r, (f + b) * 0.2, 0).Position) - camCF.Position))
+                * currentSpeed
+            flyBV.Velocity = vel
+            lastDir = Vector3.new(f + b, 0, l + r)
+        elseif currentSpeed ~= 0 then
+            -- Masih meluncur pelan (deceleration)
+            local vel = ((camCF.LookVector * lastDir.X) +
+                ((camCF * CFrame.new(lastDir.Z, lastDir.X * 0.2, 0).Position) - camCF.Position))
+                * currentSpeed
+            flyBV.Velocity = vel
+        else
+            flyBV.Velocity = Vector3.zero  -- hover stabil
+        end
+
+        -- Gyro tilt ikut arah gerak (visual keren)
+        flyBG.CFrame = camCF * CFrame.Angles(-math.rad((f + b) * 50 * currentSpeed / maxSpeed), 0, 0)
     end)
 end
 
@@ -103,13 +142,39 @@ end
 -- =========================================================
 function Fly.disable()
     if flyConn then flyConn:Disconnect(); flyConn = nil end
-    if flyBV   then flyBV:Destroy();      flyBV   = nil end
     if flyBG   then flyBG:Destroy();      flyBG   = nil end
-    local currentChar = lp.Character
-    if currentChar then
-        local currentHum = currentChar:FindFirstChildOfClass("Humanoid")
-        if currentHum then currentHum.PlatformStand = false end
+    if flyBV   then flyBV:Destroy();      flyBV   = nil end
+
+    local char = lp.Character
+    if not char then return end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+
+    hum.PlatformStand = false
+
+    -- Re-enable semua humanoid state
+    local states = {
+        Enum.HumanoidStateType.Climbing,
+        Enum.HumanoidStateType.FallingDown,
+        Enum.HumanoidStateType.Flying,
+        Enum.HumanoidStateType.Freefall,
+        Enum.HumanoidStateType.GettingUp,
+        Enum.HumanoidStateType.Jumping,
+        Enum.HumanoidStateType.Landed,
+        Enum.HumanoidStateType.Physics,
+        Enum.HumanoidStateType.PlatformStanding,
+        Enum.HumanoidStateType.Ragdoll,
+        Enum.HumanoidStateType.Running,
+        Enum.HumanoidStateType.RunningNoPhysics,
+        Enum.HumanoidStateType.Seated,
+        Enum.HumanoidStateType.StrafingNoPhysics,
+        Enum.HumanoidStateType.Swimming,
+    }
+    for _, state in ipairs(states) do
+        hum:SetStateEnabled(state, true)
     end
+    hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
 end
 
 -- =========================================================
@@ -131,5 +196,5 @@ lp.CharacterAdded:Connect(function()
     Fly.disable()
 end)
 
-print("[TIOO] fly.lua loaded! (PC + Mobile | BodyGyro)")
+print("[TIOO] fly.lua loaded! (R6+R15 | Smooth Accel)")
 return Fly
