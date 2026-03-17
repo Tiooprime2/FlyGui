@@ -1,7 +1,7 @@
 -- =========================================================
 -- TIOO Fly - Core Fly Logic
 -- by Tiooprime2
--- Fly logic dari script XNEO (1:1 sama aslinya)
+-- Fly logic: XNEO (murni 1:1)
 -- =========================================================
 
 local Players    = game:GetService("Players")
@@ -24,7 +24,7 @@ function Fly.enable()
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
 
-    -- Disable semua state
+    -- Disable semua state (sama persis XNEO)
     hum:SetStateEnabled(Enum.HumanoidStateType.Climbing,false)
     hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown,false)
     hum:SetStateEnabled(Enum.HumanoidStateType.Flying,false)
@@ -44,9 +44,8 @@ function Fly.enable()
     hum.PlatformStand = true
 
     task.spawn(function()
-        -- Detect R6 / R15 sama persis script XNEO
         if hum.RigType == Enum.HumanoidRigType.R6 then
-            -- ===================== R6 =====================
+            -- =============== R6 ===============
             local torso = char:FindFirstChild("Torso")
             if not torso then return end
 
@@ -56,55 +55,51 @@ function Fly.enable()
             local speed    = 0
 
             local bg = Instance.new("BodyGyro", torso)
-            bg.P          = 9e4
-            bg.maxTorque  = Vector3.new(9e9, 9e9, 9e9)
-            bg.cframe     = torso.CFrame
+            bg.P         = 9e4
+            bg.maxTorque = Vector3.new(9e9,9e9,9e9)
+            bg.cframe    = torso.CFrame
 
             local bv = Instance.new("BodyVelocity", torso)
-            bv.velocity = Vector3.new(0, 0.1, 0)
-            bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
+            bv.velocity = Vector3.new(0,0.1,0)
+            bv.maxForce = Vector3.new(9e9,9e9,9e9)
 
-            -- Loop SAMA PERSIS script XNEO
             while Fly.enabled do
                 RunService.RenderStepped:Wait()
                 maxspeed = Fly.speed
 
-                -- Drive ctrl dari MoveDirection (mobile + PC)
-                local md = lp.Character and
-                           lp.Character:FindFirstChildOfClass("Humanoid") and
-                           lp.Character:FindFirstChildOfClass("Humanoid").MoveDirection
-                           or Vector3.zero
-
+                -- Input dari MoveDirection (works mobile + PC)
+                local md = (lp.Character and lp.Character:FindFirstChildOfClass("Humanoid") and lp.Character:FindFirstChildOfClass("Humanoid").MoveDirection) or Vector3.zero
                 ctrl.f = md.Z < -0.1 and 1  or 0
                 ctrl.b = md.Z >  0.1 and -1 or 0
                 ctrl.r = md.X >  0.1 and 1  or 0
                 ctrl.l = md.X < -0.1 and -1 or 0
 
+                -- Accel/decel XNEO
                 if ctrl.l+ctrl.r ~= 0 or ctrl.f+ctrl.b ~= 0 then
-                    speed = speed + 0.5 + (speed/maxspeed)
+                    speed = speed+.5+(speed/maxspeed)
                     if speed > maxspeed then speed = maxspeed end
                 elseif speed ~= 0 then
-                    speed = speed - 1
+                    speed = speed-1
                     if speed < 0 then speed = 0 end
                 end
 
+                -- Velocity formula XNEO
                 if (ctrl.l+ctrl.r) ~= 0 or (ctrl.f+ctrl.b) ~= 0 then
-                    bv.velocity = ((workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f+ctrl.b)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l+ctrl.r,(ctrl.f+ctrl.b)*.2,0).p) - workspace.CurrentCamera.CoordinateFrame.p))*speed
-                    lastctrl = {f=ctrl.f, b=ctrl.b, l=ctrl.l, r=ctrl.r}
+                    bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector*(ctrl.f+ctrl.b))+((game.Workspace.CurrentCamera.CoordinateFrame*CFrame.new(ctrl.l+ctrl.r,(ctrl.f+ctrl.b)*.2,0).p)-game.Workspace.CurrentCamera.CoordinateFrame.p))*speed
+                    lastctrl = {f=ctrl.f,b=ctrl.b,l=ctrl.l,r=ctrl.r}
                 elseif (ctrl.l+ctrl.r) == 0 and (ctrl.f+ctrl.b) == 0 and speed ~= 0 then
-                    bv.velocity = ((workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f+lastctrl.b)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l+lastctrl.r,(lastctrl.f+lastctrl.b)*.2,0).p) - workspace.CurrentCamera.CoordinateFrame.p))*speed
+                    bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector*(lastctrl.f+lastctrl.b))+((game.Workspace.CurrentCamera.CoordinateFrame*CFrame.new(lastctrl.l+lastctrl.r,(lastctrl.f+lastctrl.b)*.2,0).p)-game.Workspace.CurrentCamera.CoordinateFrame.p))*speed
                 else
                     bv.velocity = Vector3.new(0,0,0)
                 end
-
-                bg.cframe = workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f+ctrl.b)*50*speed/maxspeed),0,0)
+                bg.cframe = game.Workspace.CurrentCamera.CoordinateFrame*CFrame.Angles(-math.rad((ctrl.f+ctrl.b)*50*speed/maxspeed),0,0)
             end
 
             bg:Destroy()
             bv:Destroy()
 
         else
-            -- ===================== R15 =====================
+            -- =============== R15 ===============
             local UpperTorso = char:FindFirstChild("UpperTorso")
             if not UpperTorso then return end
 
@@ -115,54 +110,50 @@ function Fly.enable()
 
             local bg = Instance.new("BodyGyro", UpperTorso)
             bg.P         = 9e4
-            bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+            bg.maxTorque = Vector3.new(9e9,9e9,9e9)
             bg.cframe    = UpperTorso.CFrame
 
             local bv = Instance.new("BodyVelocity", UpperTorso)
-            bv.velocity = Vector3.new(0, 0.1, 0)
-            bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
+            bv.velocity = Vector3.new(0,0.1,0)
+            bv.maxForce = Vector3.new(9e9,9e9,9e9)
 
-            -- Loop SAMA PERSIS script XNEO
             while Fly.enabled do
                 RunService.RenderStepped:Wait()
                 maxspeed = Fly.speed
 
-                -- Drive ctrl dari MoveDirection (mobile + PC)
-                local md = lp.Character and
-                           lp.Character:FindFirstChildOfClass("Humanoid") and
-                           lp.Character:FindFirstChildOfClass("Humanoid").MoveDirection
-                           or Vector3.zero
-
+                -- Input dari MoveDirection (works mobile + PC)
+                local md = (lp.Character and lp.Character:FindFirstChildOfClass("Humanoid") and lp.Character:FindFirstChildOfClass("Humanoid").MoveDirection) or Vector3.zero
                 ctrl.f = md.Z < -0.1 and 1  or 0
                 ctrl.b = md.Z >  0.1 and -1 or 0
                 ctrl.r = md.X >  0.1 and 1  or 0
                 ctrl.l = md.X < -0.1 and -1 or 0
 
+                -- Accel/decel XNEO
                 if ctrl.l+ctrl.r ~= 0 or ctrl.f+ctrl.b ~= 0 then
-                    speed = speed + 0.5 + (speed/maxspeed)
+                    speed = speed+.5+(speed/maxspeed)
                     if speed > maxspeed then speed = maxspeed end
                 elseif speed ~= 0 then
-                    speed = speed - 1
+                    speed = speed-1
                     if speed < 0 then speed = 0 end
                 end
 
+                -- Velocity formula XNEO
                 if (ctrl.l+ctrl.r) ~= 0 or (ctrl.f+ctrl.b) ~= 0 then
-                    bv.velocity = ((workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f+ctrl.b)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l+ctrl.r,(ctrl.f+ctrl.b)*.2,0).p) - workspace.CurrentCamera.CoordinateFrame.p))*speed
-                    lastctrl = {f=ctrl.f, b=ctrl.b, l=ctrl.l, r=ctrl.r}
+                    bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector*(ctrl.f+ctrl.b))+((game.Workspace.CurrentCamera.CoordinateFrame*CFrame.new(ctrl.l+ctrl.r,(ctrl.f+ctrl.b)*.2,0).p)-game.Workspace.CurrentCamera.CoordinateFrame.p))*speed
+                    lastctrl = {f=ctrl.f,b=ctrl.b,l=ctrl.l,r=ctrl.r}
                 elseif (ctrl.l+ctrl.r) == 0 and (ctrl.f+ctrl.b) == 0 and speed ~= 0 then
-                    bv.velocity = ((workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f+lastctrl.b)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l+lastctrl.r,(lastctrl.f+lastctrl.b)*.2,0).p) - workspace.CurrentCamera.CoordinateFrame.p))*speed
+                    bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector*(lastctrl.f+lastctrl.b))+((game.Workspace.CurrentCamera.CoordinateFrame*CFrame.new(lastctrl.l+lastctrl.r,(lastctrl.f+lastctrl.b)*.2,0).p)-game.Workspace.CurrentCamera.CoordinateFrame.p))*speed
                 else
                     bv.velocity = Vector3.new(0,0,0)
                 end
-
-                bg.cframe = workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f+ctrl.b)*50*speed/maxspeed),0,0)
+                bg.cframe = game.Workspace.CurrentCamera.CoordinateFrame*CFrame.Angles(-math.rad((ctrl.f+ctrl.b)*50*speed/maxspeed),0,0)
             end
 
             bg:Destroy()
             bv:Destroy()
         end
 
-        -- Restore setelah loop berhenti
+        -- Restore state setelah fly OFF
         local hum2 = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
         if hum2 then
             hum2.PlatformStand = false
@@ -190,7 +181,7 @@ end
 -- DISABLE
 -- =========================================================
 function Fly.disable()
-    Fly.enabled = false  -- stop while loop
+    Fly.enabled = false
 end
 
 -- =========================================================
@@ -211,5 +202,5 @@ lp.CharacterAdded:Connect(function()
     Fly.enabled = false
 end)
 
-print("[TIOO] fly.lua loaded! (XNEO 1:1)")
+print("[TIOO] fly.lua loaded! (XNEO)")
 return Fly
