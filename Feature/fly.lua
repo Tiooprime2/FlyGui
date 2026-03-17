@@ -1,7 +1,7 @@
 -- =========================================================
 -- TIOO Fly - Core Fly Logic
 -- by Tiooprime2
--- Logic fly dari script XNEO, support R6 + R15
+-- Fly logic dari script XNEO (1:1 sama aslinya)
 -- =========================================================
 
 local Players    = game:GetService("Players")
@@ -12,10 +12,6 @@ local lp = Players.LocalPlayer
 local Fly = {}
 Fly.enabled = false
 Fly.speed   = 50
-
-local flyThread = nil
-local flyBG     = nil
-local flyBV     = nil
 
 -- =========================================================
 -- ENABLE
@@ -28,112 +24,165 @@ function Fly.enable()
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
 
-    -- Disable semua state biar gak jatuh
-    local states = {
-        Enum.HumanoidStateType.Climbing,
-        Enum.HumanoidStateType.FallingDown,
-        Enum.HumanoidStateType.Flying,
-        Enum.HumanoidStateType.Freefall,
-        Enum.HumanoidStateType.GettingUp,
-        Enum.HumanoidStateType.Jumping,
-        Enum.HumanoidStateType.Landed,
-        Enum.HumanoidStateType.Physics,
-        Enum.HumanoidStateType.PlatformStanding,
-        Enum.HumanoidStateType.Ragdoll,
-        Enum.HumanoidStateType.Running,
-        Enum.HumanoidStateType.RunningNoPhysics,
-        Enum.HumanoidStateType.Seated,
-        Enum.HumanoidStateType.StrafingNoPhysics,
-        Enum.HumanoidStateType.Swimming,
-    }
-    for _, s in ipairs(states) do hum:SetStateEnabled(s, false) end
+    -- Disable semua state
+    hum:SetStateEnabled(Enum.HumanoidStateType.Climbing,false)
+    hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown,false)
+    hum:SetStateEnabled(Enum.HumanoidStateType.Flying,false)
+    hum:SetStateEnabled(Enum.HumanoidStateType.Freefall,false)
+    hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp,false)
+    hum:SetStateEnabled(Enum.HumanoidStateType.Jumping,false)
+    hum:SetStateEnabled(Enum.HumanoidStateType.Landed,false)
+    hum:SetStateEnabled(Enum.HumanoidStateType.Physics,false)
+    hum:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding,false)
+    hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll,false)
+    hum:SetStateEnabled(Enum.HumanoidStateType.Running,false)
+    hum:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics,false)
+    hum:SetStateEnabled(Enum.HumanoidStateType.Seated,false)
+    hum:SetStateEnabled(Enum.HumanoidStateType.StrafingNoPhysics,false)
+    hum:SetStateEnabled(Enum.HumanoidStateType.Swimming,false)
     hum:ChangeState(Enum.HumanoidStateType.Swimming)
     hum.PlatformStand = true
 
-    -- Detect R6 atau R15
-    local isR6 = hum.RigType == Enum.HumanoidRigType.R6
-    local torso = isR6 and char:FindFirstChild("Torso")
-                       or  char:FindFirstChild("UpperTorso")
-    if not torso then return end
+    task.spawn(function()
+        -- Detect R6 / R15 sama persis script XNEO
+        if hum.RigType == Enum.HumanoidRigType.R6 then
+            -- ===================== R6 =====================
+            local torso = char:FindFirstChild("Torso")
+            if not torso then return end
 
-    -- BodyGyro + BodyVelocity sama persis kayak script asli
-    local bg = Instance.new("BodyGyro")
-    bg.P          = 9e4
-    bg.MaxTorque  = Vector3.new(9e9, 9e9, 9e9)
-    bg.CFrame     = torso.CFrame
-    bg.Parent     = torso
-    flyBG = bg
+            local ctrl     = {f=0, b=0, l=0, r=0}
+            local lastctrl = {f=0, b=0, l=0, r=0}
+            local maxspeed = Fly.speed
+            local speed    = 0
 
-    local bv = Instance.new("BodyVelocity")
-    bv.Velocity = Vector3.new(0, 0.1, 0)
-    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    bv.Parent   = torso
-    flyBV = bv
+            local bg = Instance.new("BodyGyro", torso)
+            bg.P          = 9e4
+            bg.maxTorque  = Vector3.new(9e9, 9e9, 9e9)
+            bg.cframe     = torso.CFrame
 
-    -- Loop fly sama persis kayak script asli
-    -- ctrl di-drive dari MoveDirection (mobile joystick + PC WASD)
-    flyThread = task.spawn(function()
-        local ctrl     = {f = 0, b = 0, l = 0, r = 0}
-        local lastctrl = {f = 0, b = 0, l = 0, r = 0}
-        local speed    = 0
-        local maxspeed = Fly.speed
+            local bv = Instance.new("BodyVelocity", torso)
+            bv.velocity = Vector3.new(0, 0.1, 0)
+            bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
 
-        while Fly.enabled do
-            RunService.RenderStepped:Wait()
+            -- Loop SAMA PERSIS script XNEO
+            while Fly.enabled do
+                RunService.RenderStepped:Wait()
+                maxspeed = Fly.speed
 
-            maxspeed = Fly.speed
+                -- Drive ctrl dari MoveDirection (mobile + PC)
+                local md = lp.Character and
+                           lp.Character:FindFirstChildOfClass("Humanoid") and
+                           lp.Character:FindFirstChildOfClass("Humanoid").MoveDirection
+                           or Vector3.zero
 
-            -- Ambil input dari MoveDirection (works mobile + PC)
-            local char2 = lp.Character
-            if not char2 then break end
-            local hum2 = char2:FindFirstChildOfClass("Humanoid")
-            if not hum2 then break end
+                ctrl.f = md.Z < -0.1 and 1  or 0
+                ctrl.b = md.Z >  0.1 and -1 or 0
+                ctrl.r = md.X >  0.1 and 1  or 0
+                ctrl.l = md.X < -0.1 and -1 or 0
 
-            local md = hum2.MoveDirection
-            -- Konversi MoveDirection ke ctrl persis format script asli
-            ctrl.f =  (md.Z < -0.1) and 1 or 0   -- maju
-            ctrl.b =  (md.Z >  0.1) and -1 or 0  -- mundur
-            ctrl.r =  (md.X >  0.1) and 1 or 0   -- kanan
-            ctrl.l =  (md.X < -0.1) and -1 or 0  -- kiri
+                if ctrl.l+ctrl.r ~= 0 or ctrl.f+ctrl.b ~= 0 then
+                    speed = speed + 0.5 + (speed/maxspeed)
+                    if speed > maxspeed then speed = maxspeed end
+                elseif speed ~= 0 then
+                    speed = speed - 1
+                    if speed < 0 then speed = 0 end
+                end
 
-            -- Smooth acceleration/deceleration SAMA PERSIS script asli
-            if ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0 then
-                speed = speed + 0.5 + (speed / maxspeed)
-                if speed > maxspeed then speed = maxspeed end
-            elseif speed ~= 0 then
-                speed = speed - 1
-                if speed < 0 then speed = 0 end
+                if (ctrl.l+ctrl.r) ~= 0 or (ctrl.f+ctrl.b) ~= 0 then
+                    bv.velocity = ((workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f+ctrl.b)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l+ctrl.r,(ctrl.f+ctrl.b)*.2,0).p) - workspace.CurrentCamera.CoordinateFrame.p))*speed
+                    lastctrl = {f=ctrl.f, b=ctrl.b, l=ctrl.l, r=ctrl.r}
+                elseif (ctrl.l+ctrl.r) == 0 and (ctrl.f+ctrl.b) == 0 and speed ~= 0 then
+                    bv.velocity = ((workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f+lastctrl.b)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l+lastctrl.r,(lastctrl.f+lastctrl.b)*.2,0).p) - workspace.CurrentCamera.CoordinateFrame.p))*speed
+                else
+                    bv.velocity = Vector3.new(0,0,0)
+                end
+
+                bg.cframe = workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f+ctrl.b)*50*speed/maxspeed),0,0)
             end
 
-            local camCF = workspace.CurrentCamera.CoordinateFrame
+            bg:Destroy()
+            bv:Destroy()
 
-            -- Velocity formula SAMA PERSIS script asli
-            if (ctrl.l + ctrl.r) ~= 0 or (ctrl.f + ctrl.b) ~= 0 then
-                bv.Velocity = (
-                    (camCF.LookVector * (ctrl.f + ctrl.b)) +
-                    ((camCF * CFrame.new(ctrl.l + ctrl.r, (ctrl.f + ctrl.b) * 0.2, 0).Position) - camCF.Position)
-                ) * speed
-                lastctrl = {f = ctrl.f, b = ctrl.b, l = ctrl.l, r = ctrl.r}
+        else
+            -- ===================== R15 =====================
+            local UpperTorso = char:FindFirstChild("UpperTorso")
+            if not UpperTorso then return end
 
-            elseif (ctrl.l + ctrl.r) == 0 and (ctrl.f + ctrl.b) == 0 and speed ~= 0 then
-                -- Masih meluncur (deceleration)
-                bv.Velocity = (
-                    (camCF.LookVector * (lastctrl.f + lastctrl.b)) +
-                    ((camCF * CFrame.new(lastctrl.l + lastctrl.r, (lastctrl.f + lastctrl.b) * 0.2, 0).Position) - camCF.Position)
-                ) * speed
-            else
-                bv.Velocity = Vector3.zero
+            local ctrl     = {f=0, b=0, l=0, r=0}
+            local lastctrl = {f=0, b=0, l=0, r=0}
+            local maxspeed = Fly.speed
+            local speed    = 0
+
+            local bg = Instance.new("BodyGyro", UpperTorso)
+            bg.P         = 9e4
+            bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+            bg.cframe    = UpperTorso.CFrame
+
+            local bv = Instance.new("BodyVelocity", UpperTorso)
+            bv.velocity = Vector3.new(0, 0.1, 0)
+            bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
+
+            -- Loop SAMA PERSIS script XNEO
+            while Fly.enabled do
+                RunService.RenderStepped:Wait()
+                maxspeed = Fly.speed
+
+                -- Drive ctrl dari MoveDirection (mobile + PC)
+                local md = lp.Character and
+                           lp.Character:FindFirstChildOfClass("Humanoid") and
+                           lp.Character:FindFirstChildOfClass("Humanoid").MoveDirection
+                           or Vector3.zero
+
+                ctrl.f = md.Z < -0.1 and 1  or 0
+                ctrl.b = md.Z >  0.1 and -1 or 0
+                ctrl.r = md.X >  0.1 and 1  or 0
+                ctrl.l = md.X < -0.1 and -1 or 0
+
+                if ctrl.l+ctrl.r ~= 0 or ctrl.f+ctrl.b ~= 0 then
+                    speed = speed + 0.5 + (speed/maxspeed)
+                    if speed > maxspeed then speed = maxspeed end
+                elseif speed ~= 0 then
+                    speed = speed - 1
+                    if speed < 0 then speed = 0 end
+                end
+
+                if (ctrl.l+ctrl.r) ~= 0 or (ctrl.f+ctrl.b) ~= 0 then
+                    bv.velocity = ((workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f+ctrl.b)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l+ctrl.r,(ctrl.f+ctrl.b)*.2,0).p) - workspace.CurrentCamera.CoordinateFrame.p))*speed
+                    lastctrl = {f=ctrl.f, b=ctrl.b, l=ctrl.l, r=ctrl.r}
+                elseif (ctrl.l+ctrl.r) == 0 and (ctrl.f+ctrl.b) == 0 and speed ~= 0 then
+                    bv.velocity = ((workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f+lastctrl.b)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l+lastctrl.r,(lastctrl.f+lastctrl.b)*.2,0).p) - workspace.CurrentCamera.CoordinateFrame.p))*speed
+                else
+                    bv.velocity = Vector3.new(0,0,0)
+                end
+
+                bg.cframe = workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f+ctrl.b)*50*speed/maxspeed),0,0)
             end
 
-            -- Gyro tilt ikut arah gerak
-            bg.CFrame = camCF * CFrame.Angles(
-                -math.rad((ctrl.f + ctrl.b) * 50 * speed / maxspeed), 0, 0
-            )
+            bg:Destroy()
+            bv:Destroy()
         end
 
-        -- Cleanup setelah loop selesai
-        if flyBG then flyBG:Destroy(); flyBG = nil end
-        if flyBV then flyBV:Destroy(); flyBV = nil end
+        -- Restore setelah loop berhenti
+        local hum2 = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+        if hum2 then
+            hum2.PlatformStand = false
+            hum2:SetStateEnabled(Enum.HumanoidStateType.Climbing,true)
+            hum2:SetStateEnabled(Enum.HumanoidStateType.FallingDown,true)
+            hum2:SetStateEnabled(Enum.HumanoidStateType.Flying,true)
+            hum2:SetStateEnabled(Enum.HumanoidStateType.Freefall,true)
+            hum2:SetStateEnabled(Enum.HumanoidStateType.GettingUp,true)
+            hum2:SetStateEnabled(Enum.HumanoidStateType.Jumping,true)
+            hum2:SetStateEnabled(Enum.HumanoidStateType.Landed,true)
+            hum2:SetStateEnabled(Enum.HumanoidStateType.Physics,true)
+            hum2:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding,true)
+            hum2:SetStateEnabled(Enum.HumanoidStateType.Ragdoll,true)
+            hum2:SetStateEnabled(Enum.HumanoidStateType.Running,true)
+            hum2:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics,true)
+            hum2:SetStateEnabled(Enum.HumanoidStateType.Seated,true)
+            hum2:SetStateEnabled(Enum.HumanoidStateType.StrafingNoPhysics,true)
+            hum2:SetStateEnabled(Enum.HumanoidStateType.Swimming,true)
+            hum2:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
+        end
     end)
 end
 
@@ -141,38 +190,7 @@ end
 -- DISABLE
 -- =========================================================
 function Fly.disable()
-    Fly.enabled = false  -- stop loop
-
-    if flyBG then flyBG:Destroy(); flyBG = nil end
-    if flyBV then flyBV:Destroy(); flyBV = nil end
-    flyThread = nil
-
-    local char = lp.Character
-    if not char then return end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
-
-    hum.PlatformStand = false
-
-    local states = {
-        Enum.HumanoidStateType.Climbing,
-        Enum.HumanoidStateType.FallingDown,
-        Enum.HumanoidStateType.Flying,
-        Enum.HumanoidStateType.Freefall,
-        Enum.HumanoidStateType.GettingUp,
-        Enum.HumanoidStateType.Jumping,
-        Enum.HumanoidStateType.Landed,
-        Enum.HumanoidStateType.Physics,
-        Enum.HumanoidStateType.PlatformStanding,
-        Enum.HumanoidStateType.Ragdoll,
-        Enum.HumanoidStateType.Running,
-        Enum.HumanoidStateType.RunningNoPhysics,
-        Enum.HumanoidStateType.Seated,
-        Enum.HumanoidStateType.StrafingNoPhysics,
-        Enum.HumanoidStateType.Swimming,
-    }
-    for _, s in ipairs(states) do hum:SetStateEnabled(s, true) end
-    hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
+    Fly.enabled = false  -- stop while loop
 end
 
 -- =========================================================
@@ -191,8 +209,7 @@ end
 -- Auto cleanup saat respawn
 lp.CharacterAdded:Connect(function()
     Fly.enabled = false
-    Fly.disable()
 end)
 
-print("[TIOO] fly.lua loaded! (XNEO logic | R6+R15 | Mobile+PC)")
+print("[TIOO] fly.lua loaded! (XNEO 1:1)")
 return Fly
