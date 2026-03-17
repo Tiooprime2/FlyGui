@@ -77,20 +77,26 @@ function Fly.enable()
             flyBV = newBV
         end
 
-        local cam      = workspace.CurrentCamera
-        local look     = cam.CFrame.LookVector
-        local moveDir  = currentHum.MoveDirection  -- Works PC + Mobile joystick!
+        local cam     = workspace.CurrentCamera
+        local camCF   = cam.CFrame
+        local look    = camCF.LookVector   -- arah penuh kamera (X,Y,Z)
+        local right   = camCF.RightVector
+        local moveDir = currentHum.MoveDirection  -- PC + Mobile joystick
 
         -- Gyro ikutin arah kamera
-        flyBG.CFrame = cam.CFrame
+        flyBG.CFrame = camCF
 
-        -- Gerak horizontal dari joystick/WASD, vertikal dari arah kamera
         if moveDir.Magnitude > 0 then
-            flyBV.Velocity = Vector3.new(
-                moveDir.X * Fly.speed,
-                look.Y    * Fly.speed,  -- naik/turun sesuai sudut kamera
-                moveDir.Z * Fly.speed
-            )
+            -- Project joystick/WASD ke arah kamera (termasuk Y / naik-turun)
+            -- moveDir.Z < 0 = maju, moveDir.Z > 0 = mundur
+            -- Maju = ikut LookVector penuh (naik kalau kamera ngangkat)
+            local forward = look * (-moveDir.Z)
+            local strafe  = right * moveDir.X
+
+            local finalDir = (forward + strafe)
+            if finalDir.Magnitude > 0 then
+                flyBV.Velocity = finalDir.Unit * Fly.speed
+            end
         else
             flyBV.Velocity = Vector3.zero  -- Hover stabil
         end
