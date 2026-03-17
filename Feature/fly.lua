@@ -1,12 +1,11 @@
 -- =========================================================
 -- TIOO Fly - Core Fly Logic
 -- by Tiooprime2
--- PC + Mobile Compatible
+-- PC + Mobile Compatible (BodyGyro + BodyVelocity)
 -- =========================================================
 
 local Players          = game:GetService("Players")
 local RunService       = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 
 local lp = Players.LocalPlayer
 
@@ -16,80 +15,84 @@ Fly.speed   = 50
 
 local flyConn = nil
 local flyBV   = nil
-
--- =========================================================
--- SETUP BODY VELOCITY
--- =========================================================
-local function setupBV(part)
-    if flyBV then flyBV:Destroy() end
-    local bv    = Instance.new("BodyVelocity")
-    bv.Name     = "TIOO_FlyForce"
-    bv.Velocity = Vector3.zero
-    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    bv.P        = 1250
-    bv.Parent   = part
-    flyBV = bv
-end
+local flyBG   = nil
 
 -- =========================================================
 -- ENABLE
 -- =========================================================
 function Fly.enable()
-    if flyConn then flyConn:Disconnect() end
+    -- Cleanup dulu kalau ada sisa
+    Fly.disable()
 
     local char = lp.Character
-    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    if hrp then setupBV(hrp) end
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not char or not hum or not root then return end
 
-    flyConn = RunService.RenderStepped:Connect(function(dt)
+    hum.PlatformStand = true
+
+    -- BodyGyro: bikin karakter menghadap arah kamera (stabil, tidak goyang)
+    local bg = Instance.new("BodyGyro")
+    bg.P          = 9e4
+    bg.MaxTorque  = Vector3.new(9e9, 9e9, 9e9)
+    bg.CFrame     = root.CFrame
+    bg.Parent     = root
+    flyBG = bg
+
+    -- BodyVelocity: gerakkan karakter
+    local bv = Instance.new("BodyVelocity")
+    bv.Velocity  = Vector3.zero
+    bv.MaxForce  = Vector3.new(9e9, 9e9, 9e9)
+    bv.Parent    = root
+    flyBV = bv
+
+    flyConn = RunService.RenderStepped:Connect(function()
         if not Fly.enabled then return end
 
         local currentChar = lp.Character
-        local currentHRP  = currentChar and currentChar:FindFirstChild("HumanoidRootPart")
-        local currentHum  = currentChar and currentChar:FindFirstChild("Humanoid")
-        if not currentHRP or not currentHum then return end
+        local currentHum  = currentChar and currentChar:FindFirstChildOfClass("Humanoid")
+        local currentRoot = currentChar and currentChar:FindFirstChild("HumanoidRootPart")
+        if not currentHum or not currentRoot then return end
 
+        -- Pastikan PlatformStand aktif terus
         currentHum.PlatformStand = true
 
-        -- Rebuild BV kalau respawn / hilang
-        if not flyBV or flyBV.Parent ~= currentHRP then
-            setupBV(currentHRP)
+        -- Rebuild BG/BV kalau respawn / hilang
+        if not flyBG or flyBG.Parent ~= currentRoot then
+            if flyBG then flyBG:Destroy() end
+            local newBG = Instance.new("BodyGyro")
+            newBG.P         = 9e4
+            newBG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+            newBG.CFrame    = currentRoot.CFrame
+            newBG.Parent    = currentRoot
+            flyBG = newBG
         end
 
-        local cam = workspace.CurrentCamera
+        if not flyBV or flyBV.Parent ~= currentRoot then
+            if flyBV then flyBV:Destroy() end
+            local newBV = Instance.new("BodyVelocity")
+            newBV.Velocity = Vector3.zero
+            newBV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+            newBV.Parent   = currentRoot
+            flyBV = newBV
+        end
 
-        -- ── HORIZONTAL MOVEMENT ──────────────────────────────
-        -- Pakai MoveDirection (works PC + Mobile joystick!)
-        -- MoveDirection adalah world-space, kita project ke arah kamera
-        local rawMove = currentHum.MoveDirection  -- Vector3, magnitude 0~1
+        local cam      = workspace.CurrentCamera
+        local look     = cam.CFrame.LookVector
+        local moveDir  = currentHum.MoveDirection  -- Works PC + Mobile joystick!
 
-        local camCF  = cam.CFrame
-        local look   = Vector3.new(camCF.LookVector.X,  0, camCF.LookVector.Z)
-        local right  = Vector3.new(camCF.RightVector.X, 0, camCF.RightVector.Z)
+        -- Gyro ikutin arah kamera
+        flyBG.CFrame = cam.CFrame
 
-        -- Normalize hanya kalau tidak zero (hindari NaN)
-        if look.Magnitude  > 0 then look  = look.Unit  end
-        if right.Magnitude > 0 then right = right.Unit end
-
-        -- Project input joystick/WASD ke arah kamera
-        -- rawMove.X = strafe (kiri/kanan), rawMove.Z = maju/mundur
-        local hDir = right * rawMove.X + look * (-rawMove.Z)
-
-        -- ── VERTICAL MOVEMENT ────────────────────────────────
-        -- PC: Space / LeftControl
-        -- Mobile: bisa tambah tombol UI sendiri nanti
-        local upDown = (UserInputService:IsKeyDown(Enum.KeyCode.Space)       and 1 or 0)
-                     - (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and 1 or 0)
-
-        local finalDir = hDir + Vector3.yAxis * upDown
-
-        -- ── APPLY VELOCITY ───────────────────────────────────
-        if flyBV then
-            if finalDir.Magnitude > 0 then
-                flyBV.Velocity = finalDir.Unit * Fly.speed
-            else
-                flyBV.Velocity = Vector3.zero  -- Hover stabil
-            end
+        -- Gerak horizontal dari joystick/WASD, vertikal dari arah kamera
+        if moveDir.Magnitude > 0 then
+            flyBV.Velocity = Vector3.new(
+                moveDir.X * Fly.speed,
+                look.Y    * Fly.speed,  -- naik/turun sesuai sudut kamera
+                moveDir.Z * Fly.speed
+            )
+        else
+            flyBV.Velocity = Vector3.zero  -- Hover stabil
         end
     end)
 end
@@ -100,9 +103,10 @@ end
 function Fly.disable()
     if flyConn then flyConn:Disconnect(); flyConn = nil end
     if flyBV   then flyBV:Destroy();      flyBV   = nil end
+    if flyBG   then flyBG:Destroy();      flyBG   = nil end
     local currentChar = lp.Character
     if currentChar then
-        local currentHum = currentChar:FindFirstChild("Humanoid")
+        local currentHum = currentChar:FindFirstChildOfClass("Humanoid")
         if currentHum then currentHum.PlatformStand = false end
     end
 end
@@ -126,5 +130,5 @@ lp.CharacterAdded:Connect(function()
     Fly.disable()
 end)
 
-print("[TIOO] fly.lua loaded! (PC + Mobile)")
+print("[TIOO] fly.lua loaded! (PC + Mobile | BodyGyro)")
 return Fly

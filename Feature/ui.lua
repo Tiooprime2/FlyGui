@@ -57,10 +57,12 @@ end
 local function makeDraggable(frame, handle)
     handle = handle or frame
     local dragging, dragStart, startPos
+    local DRAG_THRESHOLD = 10  -- pixel, geser > 10px baru dianggap drag
+
     handle.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
         or input.UserInputType == Enum.UserInputType.Touch then
-            dragging  = true
+            dragging  = false  -- belum dianggap drag sampai lewat threshold
             dragStart = input.Position
             startPos  = frame.Position
             input.Changed:Connect(function()
@@ -71,17 +73,23 @@ local function makeDraggable(frame, handle)
         end
     end)
     UserInputService.InputChanged:Connect(function(input)
-        if dragging and (
+        if dragStart and (
             input.UserInputType == Enum.UserInputType.MouseMovement or
             input.UserInputType == Enum.UserInputType.Touch
         ) then
             local d = input.Position - dragStart
-            tw(frame, 0.06, {
-                Position = UDim2.new(
-                    startPos.X.Scale, startPos.X.Offset + d.X,
-                    startPos.Y.Scale, startPos.Y.Offset + d.Y
-                )
-            })
+            -- Baru aktif drag kalau jarak geser sudah > threshold
+            if not dragging and (math.abs(d.X) > DRAG_THRESHOLD or math.abs(d.Y) > DRAG_THRESHOLD) then
+                dragging = true
+            end
+            if dragging then
+                tw(frame, 0.06, {
+                    Position = UDim2.new(
+                        startPos.X.Scale, startPos.X.Offset + d.X,
+                        startPos.Y.Scale, startPos.Y.Offset + d.Y
+                    )
+                })
+            end
         end
     end)
 end
@@ -380,10 +388,24 @@ function UI.init(Fly)
         end
     end
 
+    -- Tap detection untuk card: hanya toggle kalau tidak geser (jarak < threshold)
+    local TAP_THRESHOLD = 10
+    local cardTapStart = nil
+
     flyCard.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1
         or i.UserInputType == Enum.UserInputType.Touch then
-            setFly(not Fly.enabled)
+            cardTapStart = i.Position
+        end
+    end)
+    flyCard.InputEnded:Connect(function(i)
+        if (i.UserInputType == Enum.UserInputType.MouseButton1
+        or i.UserInputType == Enum.UserInputType.Touch) and cardTapStart then
+            local dist = (i.Position - cardTapStart).Magnitude
+            if dist < TAP_THRESHOLD then
+                setFly(not Fly.enabled)
+            end
+            cardTapStart = nil
         end
     end)
     flyPill.MouseButton1Click:Connect(function()
