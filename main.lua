@@ -4,8 +4,8 @@
 -- Execute file ini di executor kamu!
 -- =========================================================
 
-local FLY_URL = "https://raw.githubusercontent.com/Tiooprime2/FlyGui/main/fly.lua"
-local UI_URL  = "https://raw.githubusercontent.com/Tiooprime2/FlyGui/main/ui.lua"
+local FLY_URL = "https://raw.githubusercontent.com/Tiooprime2/FlyGui/main/Feature/fly.lua"
+local UI_URL  = "https://raw.githubusercontent.com/Tiooprime2/FlyGui/main/Feature/ui.lua"
 
 -- =========================================================
 -- LOADER HELPER
