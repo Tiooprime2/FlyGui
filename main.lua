@@ -4,16 +4,12 @@
 -- Execute file ini di executor kamu!
 -- =========================================================
 
--- ▼▼▼ GANTI URL INI dengan raw GitHub URL file kamu ▼▼▼
 local FLY_URL = "https://raw.githubusercontent.com/Tiooprime2/FlyGui/main/fly.lua"
 local UI_URL  = "https://raw.githubusercontent.com/Tiooprime2/FlyGui/main/ui.lua"
--- ▲▲▲ ▲▲▲ ▲▲▲ ▲▲▲ ▲▲▲ ▲▲▲ ▲▲▲ ▲▲▲ ▲▲▲ ▲▲▲ ▲▲▲ ▲▲▲ ▲▲▲
 
 -- =========================================================
 -- LOADER HELPER
 -- =========================================================
-local HttpService = game:GetService("HttpService")
-
 local function loadModule(url)
     local ok, result = pcall(function()
         return loadstring(game:HttpGet(url, true))()
